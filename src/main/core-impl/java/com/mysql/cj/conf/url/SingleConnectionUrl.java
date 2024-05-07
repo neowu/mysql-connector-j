@@ -24,6 +24,7 @@ import java.util.Properties;
 
 import com.mysql.cj.conf.ConnectionUrl;
 import com.mysql.cj.conf.ConnectionUrlParser;
+import com.mysql.cj.exceptions.WrongArgumentException;
 
 public class SingleConnectionUrl extends ConnectionUrl {
 
@@ -35,7 +36,7 @@ public class SingleConnectionUrl extends ConnectionUrl {
      * @param info
      *            the connection arguments map
      */
-    public SingleConnectionUrl(ConnectionUrlParser connStrParser, Properties info) {
+    public SingleConnectionUrl(ConnectionUrlParser connStrParser, Properties info) throws WrongArgumentException {
         super(connStrParser, info);
         this.type = Type.SINGLE_CONNECTION;
     }

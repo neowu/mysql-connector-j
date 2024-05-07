@@ -22,24 +22,16 @@ package com.mysql.cj.protocol;
 
 import com.mysql.cj.BindValue;
 import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
+import com.mysql.cj.exceptions.CJException;
 
 public interface ValueEncoder {
+    void init(PropertySet pset, ServerSession serverSession);
 
-    void init(PropertySet pset, ServerSession serverSession, ExceptionInterceptor exceptionInterceptor);
+    byte[] getBytes(BindValue binding) throws CJException;
 
-    byte[] getBytes(BindValue binding);
+    String getString(BindValue binding) throws CJException;
 
-    String getString(BindValue binding);
+    long getTextLength(BindValue binding) throws CJException;
 
-    long getTextLength(BindValue binding);
-
-    long getBinaryLength(BindValue binding);
-
-    void encodeAsText(Message msg, BindValue binding);
-
-    void encodeAsBinary(Message msg, BindValue binding);
-
-    void encodeAsQueryAttribute(Message msg, BindValue binding);
-
+    void encodeAsText(Message msg, BindValue binding) throws CJException;
 }

@@ -20,11 +20,8 @@
 
 package com.mysql.cj.conf;
 
-import java.util.Properties;
-
 import javax.naming.Reference;
-
-import com.mysql.cj.exceptions.ExceptionInterceptor;
+import java.util.Properties;
 
 public interface RuntimeProperty<T> {
 
@@ -40,12 +37,10 @@ public interface RuntimeProperty<T> {
      *
      * @param extractFrom
      *            {@link Properties} object containing key-value pairs usually passed from connection string.
-     * @param exceptionInterceptor
-     *            exceptionInterceptor
      */
-    void initializeFrom(Properties extractFrom, ExceptionInterceptor exceptionInterceptor);
+    void initializeFrom(Properties extractFrom);
 
-    void initializeFrom(Reference ref, ExceptionInterceptor exceptionInterceptor);
+    void initializeFrom(Reference ref);
 
     /**
      * Reset to initial value (default or defined in connection string/Properties)
@@ -53,23 +48,6 @@ public interface RuntimeProperty<T> {
     void resetValue();
 
     boolean isExplicitlySet();
-
-    /**
-     * Add listener for this property changes.
-     *
-     * @param l
-     *            {@link RuntimePropertyListener}
-     */
-    void addListener(RuntimePropertyListener l);
-
-    void removeListener(RuntimePropertyListener l);
-
-    @FunctionalInterface
-    public static interface RuntimePropertyListener {
-
-        void handlePropertyChange(RuntimeProperty<?> prop);
-
-    }
 
     /**
      * Get internal value representation as Object.
@@ -99,15 +77,4 @@ public interface RuntimeProperty<T> {
      *            value
      */
     void setValue(T value);
-
-    /**
-     * Set the object value of a property directly. Validation against allowable values will be performed.
-     *
-     * @param value
-     *            value
-     * @param exceptionInterceptor
-     *            exception interceptor
-     */
-    void setValue(T value, ExceptionInterceptor exceptionInterceptor);
-
 }

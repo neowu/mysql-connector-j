@@ -20,78 +20,33 @@
 
 package com.mysql.cj;
 
-import java.io.InputStream;
-import java.io.Reader;
+import com.mysql.cj.exceptions.CJException;
+import com.mysql.cj.exceptions.WrongArgumentException;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.sql.Clob;
-import java.sql.Date;
-import java.sql.NClob;
-import java.sql.Time;
-import java.sql.Timestamp;
-import java.util.Calendar;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import com.mysql.cj.protocol.ColumnDefinition;
-import com.mysql.cj.result.Field;
 
 public interface QueryBindings {
 
-    QueryBindings clone();
-
-    void setColumnDefinition(ColumnDefinition colDef);
+    QueryBindings copy();
 
     BindValue[] getBindValues();
 
-    void setBindValues(BindValue[] bindValues);
+    void checkParameterSet(int columnIndex) throws CJException;
 
-    /**
-     *
-     * @return true if bind values had long data
-     */
-    boolean clearBindValues();
-
-    void checkParameterSet(int columnIndex);
-
-    void checkAllParametersSet();
-
-    int getNumberOfExecutions();
-
-    void setNumberOfExecutions(int numberOfExecutions);
-
-    boolean isLongParameterSwitchDetected();
-
-    void setLongParameterSwitchDetected(boolean longParameterSwitchDetected);
-
-    AtomicBoolean getSendTypesToServer();
-
-    BindValue getBinding(int parameterIndex, boolean forLongData);
+    void checkAllParametersSet() throws CJException;
 
     void setFromBindValue(int parameterIndex, BindValue bv);
-
-    void setAsciiStream(int parameterIndex, InputStream x, int length);
 
     void setBigDecimal(int parameterIndex, BigDecimal x);
 
     void setBigInteger(int parameterIndex, BigInteger x);
 
-    void setBinaryStream(int parameterIndex, InputStream x, int length);
-
-    void setBlob(int parameterIndex, java.sql.Blob x);
-
     void setBoolean(int parameterIndex, boolean x);
 
     void setByte(int parameterIndex, byte x);
 
-    void setBytes(int parameterIndex, byte[] x, boolean escapeIfNeeded);
-
-    void setCharacterStream(int parameterIndex, Reader reader, int length);
-
-    void setClob(int i, Clob x);
-
-    void setDate(int parameterIndex, Date x, Calendar cal);
-
-    void setDouble(int parameterIndex, double x);
+    void setDouble(int parameterIndex, double x) throws WrongArgumentException;
 
     void setFloat(int parameterIndex, float x);
 
@@ -99,28 +54,15 @@ public interface QueryBindings {
 
     void setLong(int parameterIndex, long x);
 
-    void setNCharacterStream(int parameterIndex, Reader reader, long length);
-
-    void setNClob(int parameterIndex, NClob value);
-
-    void setNString(int parameterIndex, String x);
-
     void setNull(int parameterIndex);
 
     boolean isNull(int parameterIndex);
 
-    void setObject(int parameterIndex, Object parameterObj);
+    void setObject(int parameterIndex, Object parameterObj) throws CJException;
 
-    void setObject(int parameterIndex, Object parameterObj, MysqlType targetMysqlType, int scaleOrLength);
+    void setObject(int parameterIndex, Object parameterObj, MysqlType targetMysqlType, int scaleOrLength) throws CJException;
 
     void setShort(int parameterIndex, short x);
 
     void setString(int parameterIndex, String x);
-
-    void setTime(int parameterIndex, Time x, Calendar cal);
-
-    void setTimestamp(int parameterIndex, Timestamp x, Calendar targetCalendar, Field field, MysqlType targetMysqlType);
-
-    byte[] getBytesRepresentation(int parameterIndex);
-
 }

@@ -26,6 +26,7 @@ import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.util.Calendar;
 
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.util.TimeUtil;
 
 public class InternalTime {
@@ -132,7 +133,11 @@ public class InternalTime {
     @Override
     public String toString() {
         if (this.nanos > 0) {
-            return String.format("%02d:%02d:%02d.%s", this.hours, this.minutes, this.seconds, TimeUtil.formatNanos(this.nanos, this.scale, false));
+            try {
+                return String.format("%02d:%02d:%02d.%s", this.hours, this.minutes, this.seconds, TimeUtil.formatNanos(this.nanos, this.scale, false));
+            } catch (WrongArgumentException e) {
+                throw new Error(e);
+            }
         }
         return String.format("%02d:%02d:%02d", this.hours, this.minutes, this.seconds);
     }

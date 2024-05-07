@@ -20,34 +20,25 @@
 
 package com.mysql.cj.conf;
 
-import static com.mysql.cj.util.StringUtils.isNullOrEmpty;
+import com.mysql.cj.Messages;
+import com.mysql.cj.conf.url.SingleConnectionUrl;
+import com.mysql.cj.exceptions.ExceptionFactory;
+import com.mysql.cj.exceptions.UnsupportedConnectionStringException;
+import com.mysql.cj.exceptions.WrongArgumentException;
+import com.mysql.cj.util.LRUCache;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.TreeMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
-import javax.naming.NamingException;
-
-import com.mysql.cj.Messages;
-import com.mysql.cj.exceptions.CJException;
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.InvalidConnectionAttributeException;
-import com.mysql.cj.exceptions.UnsupportedConnectionStringException;
-import com.mysql.cj.exceptions.WrongArgumentException;
-import com.mysql.cj.util.DnsSrv;
-import com.mysql.cj.util.DnsSrv.SrvRecord;
-import com.mysql.cj.util.LRUCache;
-import com.mysql.cj.util.Util;
+import static com.mysql.cj.util.StringUtils.isNullOrEmpty;
 
 /**
  * A container for a database URL and a collection of given connection arguments.
@@ -56,7 +47,6 @@ import com.mysql.cj.util.Util;
  * type or apply validation rules.
  */
 public abstract class ConnectionUrl implements DatabaseUrlContainer {
-
     public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 3306;
 
@@ -64,152 +54,20 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
     private static final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
     /**
-     * The rules describing the number of hosts a database URL may contain.
-     */
-    public enum HostsCardinality {
-
-        SINGLE {
-
-            @Override
-            public boolean assertSize(int n) {
-                return n == 1;
-            }
-
-        },
-        MULTIPLE {
-
-            @Override
-            public boolean assertSize(int n) {
-                return n > 1;
-            }
-
-        },
-        ONE_OR_MORE {
-
-            @Override
-            public boolean assertSize(int n) {
-                return n >= 1;
-            }
-
-        };
-
-        public abstract boolean assertSize(int n);
-
-    }
-
-    /**
      * The database URL type which is determined by the scheme section of the connection string.
      */
     public enum Type {
-
-        // DNS SRV schemes (cardinality is validated by implementing classes):
-        FAILOVER_DNS_SRV_CONNECTION("jdbc:mysql+srv:", HostsCardinality.ONE_OR_MORE, "com.mysql.cj.conf.url.FailoverDnsSrvConnectionUrl"), //
-        LOADBALANCE_DNS_SRV_CONNECTION("jdbc:mysql+srv:loadbalance:", HostsCardinality.ONE_OR_MORE, "com.mysql.cj.conf.url.LoadBalanceDnsSrvConnectionUrl"), //
-        REPLICATION_DNS_SRV_CONNECTION("jdbc:mysql+srv:replication:", HostsCardinality.ONE_OR_MORE, "com.mysql.cj.conf.url.ReplicationDnsSrvConnectionUrl"), //
-        XDEVAPI_DNS_SRV_SESSION("mysqlx+srv:", HostsCardinality.ONE_OR_MORE, "com.mysql.cj.conf.url.XDevApiDnsSrvConnectionUrl"), //
         // Standard schemes:
-        SINGLE_CONNECTION("jdbc:mysql:", HostsCardinality.SINGLE, "com.mysql.cj.conf.url.SingleConnectionUrl", PropertyKey.dnsSrv, FAILOVER_DNS_SRV_CONNECTION), //
-        FAILOVER_CONNECTION("jdbc:mysql:", HostsCardinality.MULTIPLE, "com.mysql.cj.conf.url.FailoverConnectionUrl", PropertyKey.dnsSrv,
-                FAILOVER_DNS_SRV_CONNECTION), //
-        LOADBALANCE_CONNECTION("jdbc:mysql:loadbalance:", HostsCardinality.ONE_OR_MORE, "com.mysql.cj.conf.url.LoadBalanceConnectionUrl", PropertyKey.dnsSrv,
-                LOADBALANCE_DNS_SRV_CONNECTION), //
-        REPLICATION_CONNECTION("jdbc:mysql:replication:", HostsCardinality.ONE_OR_MORE, "com.mysql.cj.conf.url.ReplicationConnectionUrl", PropertyKey.dnsSrv,
-                REPLICATION_DNS_SRV_CONNECTION), //
-        XDEVAPI_SESSION("mysqlx:", HostsCardinality.ONE_OR_MORE, "com.mysql.cj.conf.url.XDevApiConnectionUrl", PropertyKey.xdevapiDnsSrv,
-                XDEVAPI_DNS_SRV_SESSION);
+        SINGLE_CONNECTION("jdbc:mysql:");
 
-        private String scheme;
-        private HostsCardinality cardinality;
-        private String implementingClass;
-        private PropertyKey dnsSrvPropertyKey;
-        private Type alternateDnsSrvType;
+        private final String scheme;
 
-        private Type(String scheme, HostsCardinality cardinality, String implementingClass) {
-            this(scheme, cardinality, implementingClass, null, null);
-        }
-
-        private Type(String scheme, HostsCardinality cardinality, String implementingClass, PropertyKey dnsSrvPropertyKey, Type alternateDnsSrvType) {
+        private Type(String scheme) {
             this.scheme = scheme;
-            this.cardinality = cardinality;
-            this.implementingClass = implementingClass;
-            this.dnsSrvPropertyKey = dnsSrvPropertyKey;
-            this.alternateDnsSrvType = alternateDnsSrvType;
         }
 
         public String getScheme() {
             return this.scheme;
-        }
-
-        public HostsCardinality getCardinality() {
-            return this.cardinality;
-        }
-
-        public String getImplementingClass() {
-            return this.implementingClass;
-        }
-
-        public PropertyKey getDnsSrvPropertyKey() {
-            return this.dnsSrvPropertyKey;
-        }
-
-        public Type getAlternateDnsSrvType() {
-            return this.alternateDnsSrvType;
-        }
-
-        /**
-         * Returns the {@link Type} corresponding to the given scheme and number of hosts, if any.
-         * Otherwise throws an {@link UnsupportedConnectionStringException}.
-         * Calling this method with the argument n lower than 0 skips the hosts cardinality validation.
-         *
-         * @param scheme
-         *            one of supported schemes
-         * @param n
-         *            the number of hosts in the database URL
-         * @return the {@link Type} corresponding to the given protocol and number of hosts
-         */
-        public static Type fromValue(String scheme, int n) {
-            for (Type t : values()) {
-                if (t.getScheme().equalsIgnoreCase(scheme) && (n < 0 || t.getCardinality().assertSize(n))) {
-                    return t;
-                }
-            }
-            if (n < 0) {
-                throw ExceptionFactory.createException(UnsupportedConnectionStringException.class,
-                        Messages.getString("ConnectionString.5", new Object[] { scheme }));
-            }
-            throw ExceptionFactory.createException(UnsupportedConnectionStringException.class,
-                    Messages.getString("ConnectionString.6", new Object[] { scheme, n }));
-        }
-
-        /**
-         * Instantiates a class that implements the right type of connection URLs for the given {@link ConnectionUrlParser}.
-         *
-         * @param parser
-         *            the {@link ConnectionUrlParser} containing the URL components.
-         * @param info
-         *            a connection properties map to add to the {@link ConnectionUrl} structure.
-         * @return
-         *         an instance of {@link ConnectionUrl}.
-         */
-        public static ConnectionUrl getConnectionUrlInstance(ConnectionUrlParser parser, Properties info) {
-            int hostsCount = parser.getHosts().size();
-            Type type = fromValue(parser.getScheme(), hostsCount);
-            PropertyKey dnsSrvPropKey = type.getDnsSrvPropertyKey();
-            Map<String, String> parsedProperties;
-
-            // Check if the Type must be replaced by a DNS SRV one.
-            if (dnsSrvPropKey != null && type.getAlternateDnsSrvType() != null) {
-                if (info != null && info.containsKey(dnsSrvPropKey.getKeyName())) { // Properties map prevails over connection string options.
-                    if ((Boolean) PropertyDefinitions.getPropertyDefinition(dnsSrvPropKey).parseObject(info.getProperty(dnsSrvPropKey.getKeyName()), null)) {
-                        type = fromValue(type.getAlternateDnsSrvType().getScheme(), hostsCount);
-                    }
-                } else if ((parsedProperties = parser.getProperties()).containsKey(dnsSrvPropKey.getKeyName()) && (Boolean) PropertyDefinitions
-                        .getPropertyDefinition(dnsSrvPropKey).parseObject(parsedProperties.get(dnsSrvPropKey.getKeyName()), null)) {
-                    type = fromValue(type.getAlternateDnsSrvType().getScheme(), hostsCount);
-                }
-            }
-
-            return type.getImplementingInstance(parser, info);
         }
 
         /**
@@ -228,21 +86,6 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
             return false;
         }
 
-        /**
-         * Instantiates a class that implements this type of connection URLs with the given arguments.
-         *
-         * @param parser
-         *            the {@link ConnectionUrlParser} containing the URL components.
-         * @param info
-         *            a connection properties map to add to the {@link ConnectionUrl} structure.
-         * @return
-         *         an instance of {@link ConnectionUrl}.
-         */
-        private ConnectionUrl getImplementingInstance(ConnectionUrlParser parser, Properties info) {
-            return Util.getInstance(ConnectionUrl.class, this.implementingClass, new Class<?>[] { ConnectionUrlParser.class, Properties.class },
-                    new Object[] { parser, info }, null);
-        }
-
     }
 
     protected Type type;
@@ -250,7 +93,6 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
     protected String originalDatabase;
     protected List<HostInfo> hosts = new ArrayList<>();
     protected Map<String, String> properties = new HashMap<>();
-    ConnectionPropertiesTransform propertiesTransformer;
 
     /**
      * Static factory method that returns either a new instance of a {@link ConnectionUrl} or a cached one.
@@ -262,9 +104,9 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
      *            the connection arguments map
      * @return an instance of a {@link ConnectionUrl} or "null" if isn't able to handle the connection string
      */
-    public static ConnectionUrl getConnectionUrlInstance(String connString, Properties info) {
+    public static ConnectionUrl getConnectionUrlInstance(String connString, Properties info) throws SQLException, UnsupportedConnectionStringException, WrongArgumentException {
         if (connString == null) {
-            throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("ConnectionString.0"));
+            throw new SQLException(Messages.getString("ConnectionString.0"));
         }
         String connStringCacheKey = buildConnectionStringCacheKey(connString, info);
         ConnectionUrl connectionUrl;
@@ -279,7 +121,7 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
                 connectionUrl = connectionUrlCache.get(connStringCacheKey);
                 if (connectionUrl == null) {
                     ConnectionUrlParser connStrParser = ConnectionUrlParser.parseConnectionString(connString);
-                    connectionUrl = Type.getConnectionUrlInstance(connStrParser, info);
+                    connectionUrl = new SingleConnectionUrl(connStrParser, info);
                     connectionUrlCache.put(connStringCacheKey, connectionUrl);
                 }
                 rwLock.readLock().lock();
@@ -315,24 +157,8 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
      *            the connection string
      * @return true if this class is able to process the given URL, false otherwise
      */
-    public static boolean acceptsUrl(String connString) {
+    public static boolean acceptsUrl(String connString) throws WrongArgumentException {
         return ConnectionUrlParser.isConnectionStringSupported(connString);
-    }
-
-    /**
-     * Empty constructor. Required for subclasses initialization.
-     */
-    protected ConnectionUrl() {
-    }
-
-    /**
-     * Constructor for unsupported URLs
-     *
-     * @param origUrl
-     *            URLs
-     */
-    public ConnectionUrl(String origUrl) {
-        this.originalConnStr = origUrl;
     }
 
     /**
@@ -343,7 +169,7 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
      * @param info
      *            the connection arguments map
      */
-    protected ConnectionUrl(ConnectionUrlParser connStrParser, Properties info) {
+    protected ConnectionUrl(ConnectionUrlParser connStrParser, Properties info) throws WrongArgumentException {
         this.originalConnStr = connStrParser.getDatabaseUrl();
         this.originalDatabase = connStrParser.getPath() == null ? "" : connStrParser.getPath();
         collectProperties(connStrParser, info); // Fill properties before filling hosts info.
@@ -359,97 +185,13 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
      * @param info
      *            the connection arguments map
      */
-    protected void collectProperties(ConnectionUrlParser connStrParser, Properties info) {
+    protected void collectProperties(ConnectionUrlParser connStrParser, Properties info) throws WrongArgumentException {
         // Fill in the properties from the connection string.
         connStrParser.getProperties().entrySet().stream().forEach(e -> this.properties.put(PropertyKey.normalizeCase(e.getKey()), e.getValue()));
 
         // Properties passed in override the ones from the connection string.
         if (info != null) {
             info.stringPropertyNames().stream().forEach(k -> this.properties.put(PropertyKey.normalizeCase(k), info.getProperty(k)));
-        }
-
-        // Collect properties from additional sources.
-        setupPropertiesTransformer();
-        expandPropertiesFromConfigFiles(this.properties);
-        injectPerTypeProperties(this.properties);
-    }
-
-    /**
-     * Sets up the {@link ConnectionPropertiesTransform} if one was provided.
-     */
-    protected void setupPropertiesTransformer() {
-        String propertiesTransformClassName = this.properties.get(PropertyKey.propertiesTransform.getKeyName());
-        if (!isNullOrEmpty(propertiesTransformClassName)) {
-            try {
-                this.propertiesTransformer = Util.getInstance(ConnectionPropertiesTransform.class, propertiesTransformClassName, null, null, null);
-            } catch (CJException e) {
-                throw ExceptionFactory.createException(InvalidConnectionAttributeException.class, Messages.getString("ConnectionString.9"), e);
-            }
-        }
-    }
-
-    /**
-     * Expands the connection argument "useConfig" by reading the mentioned configuration files.
-     *
-     * @param props
-     *            a connection arguments map from where to read the "useConfig" property and where to save the loaded properties.
-     */
-    protected void expandPropertiesFromConfigFiles(Map<String, String> props) {
-        // Properties from config files should not override the existing ones.
-        String configFiles = props.get(PropertyKey.useConfigs.getKeyName());
-        if (!isNullOrEmpty(configFiles)) {
-            Properties configProps = getPropertiesFromConfigFiles(configFiles);
-            configProps.stringPropertyNames().stream().map(PropertyKey::normalizeCase).filter(k -> !props.containsKey(k))
-                    .forEach(k -> props.put(k, configProps.getProperty(k)));
-        }
-    }
-
-    /**
-     * Returns a map containing the properties read from the given configuration files. Multiple files can be referenced using a comma as separator.
-     *
-     * @param configFiles
-     *            the list of the configuration files to read
-     * @return the map containing all the properties read
-     */
-    public static Properties getPropertiesFromConfigFiles(String configFiles) {
-        Properties configProps = new Properties();
-        for (String configFile : configFiles.split(",")) {
-            try (InputStream configAsStream = ConnectionUrl.class.getResourceAsStream("/com/mysql/cj/configurations/" + configFile + ".properties")) {
-                if (configAsStream == null) {
-                    throw ExceptionFactory.createException(InvalidConnectionAttributeException.class,
-                            Messages.getString("ConnectionString.10", new Object[] { configFile }));
-                }
-                configProps.load(configAsStream);
-            } catch (IOException e) {
-                throw ExceptionFactory.createException(InvalidConnectionAttributeException.class,
-                        Messages.getString("ConnectionString.11", new Object[] { configFile }), e);
-            }
-        }
-        return configProps;
-    }
-
-    /**
-     * Subclasses must override this method if they need to inject additional properties in the connection arguments map while it's being constructed.
-     *
-     * @param props
-     *            the properties already containing all known connection arguments
-     */
-    protected void injectPerTypeProperties(Map<String, String> props) {
-        return;
-    }
-
-    /**
-     * Some acceptable property values have changed in c/J 8.0 but old values remain hard-coded in widely used software.
-     * So, old values must be accepted and translated to new ones.
-     *
-     * @param props
-     *            the host properties map to fix
-     */
-    protected void replaceLegacyPropertyValues(Map<String, String> props) {
-        // Workaround for zeroDateTimeBehavior=convertToNull hard-coded in NetBeans
-        String zeroDateTimeBehavior = props.get(PropertyKey.zeroDateTimeBehavior.getKeyName());
-        if (zeroDateTimeBehavior != null && zeroDateTimeBehavior.equalsIgnoreCase("convertToNull")) {
-            props.put(PropertyKey.zeroDateTimeBehavior.getKeyName(), "CONVERT_TO_NULL");
         }
     }
 
@@ -459,19 +201,22 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
      * @param connStrParser
      *            the {@link ConnectionUrlParser} from where to collect the hosts information
      */
-    protected void collectHostsInfo(ConnectionUrlParser connStrParser) {
-        connStrParser.getHosts().stream().map(this::fixHostInfo).forEach(this.hosts::add);
+    protected void collectHostsInfo(ConnectionUrlParser connStrParser) throws WrongArgumentException {
+        List<HostInfo> hostInfos = this.hosts;
+        for (HostInfo hostInfo : connStrParser.getHosts()) {
+            HostInfo info = fixHostInfo(hostInfo);
+            hostInfos.add(info);
+        }
     }
 
     /**
      * Fixes the host information by moving data around and filling in missing data.
-     * Applies properties transformations to the collected properties if {@link ConnectionPropertiesTransform} was declared in the connection arguments.
      *
      * @param hi
      *            the host information data to fix
      * @return a new {@link HostInfo} with all required data
      */
-    protected HostInfo fixHostInfo(HostInfo hi) {
+    protected HostInfo fixHostInfo(HostInfo hi) throws WrongArgumentException {
         Map<String, String> hostProps = new HashMap<>();
 
         // Add global connection arguments.
@@ -482,8 +227,6 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
         if (!hostProps.containsKey(PropertyKey.DBNAME.getKeyName())) {
             hostProps.put(PropertyKey.DBNAME.getKeyName(), getDatabase());
         }
-
-        preprocessPerTypeHostProperties(hostProps);
 
         String host = hostProps.remove(PropertyKey.HOST.getKeyName());
         if (!isNullOrEmpty(hi.getHost())) {
@@ -520,21 +263,7 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
             password = getDefaultPassword();
         }
 
-        expandPropertiesFromConfigFiles(hostProps);
-        fixProtocolDependencies(hostProps);
-        replaceLegacyPropertyValues(hostProps);
-
-        return buildHostInfo(host, port, user, password, hostProps);
-    }
-
-    /**
-     * Subclasses should override this to perform any required pre-processing on the host information properties.
-     *
-     * @param hostProps
-     *            the host properties map to process
-     */
-    protected void preprocessPerTypeHostProperties(Map<String, String> hostProps) {
-        // To be overridden in subclasses if needed.
+        return new HostInfo(this, host, port, user, password, hostProps);
     }
 
     /**
@@ -575,21 +304,6 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
     }
 
     /**
-     * Fixes the protocol (TCP vs PIPE) dependencies for the given host properties map.
-     *
-     * @param hostProps
-     *            the host properties map to fix
-     */
-    protected void fixProtocolDependencies(Map<String, String> hostProps) {
-        String protocol = hostProps.get(PropertyKey.PROTOCOL.getKeyName());
-        if (!isNullOrEmpty(protocol) && protocol.equalsIgnoreCase("PIPE")) {
-            if (!hostProps.containsKey(PropertyKey.socketFactory.getKeyName())) {
-                hostProps.put(PropertyKey.socketFactory.getKeyName(), "com.mysql.cj.protocol.NamedPipeSocketFactory");
-            }
-        }
-    }
-
-    /**
      * Returns this connection URL type.
      *
      * @return the connection URL type
@@ -618,202 +332,12 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
     }
 
     /**
-     * Returns the number of hosts in this connection URL.
-     *
-     * @return the number of hosts
-     */
-    public int hostsCount() {
-        return this.hosts.size();
-    }
-
-    /**
      * Returns the single or first host info structure.
      *
      * @return the first host info structure
      */
     public HostInfo getMainHost() {
-        return this.hosts.isEmpty() ? null : this.hosts.get(0);
-    }
-
-    /**
-     * Returns a list of the hosts in this connection URL.
-     *
-     * @return the hosts list from this connection URL
-     */
-    public List<HostInfo> getHostsList() {
-        return getHostsList(HostsListView.ALL);
-    }
-
-    /**
-     * Returns a list of the hosts in this connection URL, filtered for the given view.
-     *
-     * By default returns all hosts. Subclasses should override this method in order to implement support for different views, usually by splitting the global
-     * hosts into smaller sub-lists.
-     *
-     * @param view
-     *            the type of the view to use in the returned list of hosts. This argument is ignored in this implementation.
-     * @return
-     *         the hosts list from this connection URL, filtered for the given view.
-     */
-    public List<HostInfo> getHostsList(HostsListView view) {
-        return Collections.unmodifiableList(this.hosts);
-    }
-
-    /**
-     * Returns an existing host info with the same host:port part or spawns a new isolated host info based on this connection URL if none was found.
-     *
-     * @param hostPortPair
-     *            the host:port part to search for
-     * @return the existing host info or a new independent one
-     */
-    public HostInfo getHostOrSpawnIsolated(String hostPortPair) {
-        return getHostOrSpawnIsolated(hostPortPair, this.hosts);
-    }
-
-    /**
-     * Returns an existing host info with the same host:port part or spawns a new isolated host info based on this connection URL if none was found.
-     *
-     * @param hostPortPair
-     *            the host:port part to search for
-     * @param hostsList
-     *            the hosts list from where to search the host list
-     * @return the existing host info or a new independent one
-     */
-    public HostInfo getHostOrSpawnIsolated(String hostPortPair, List<HostInfo> hostsList) {
-        for (HostInfo hi : hostsList) {
-            if (hostPortPair.equals(hi.getHostPortPair())) {
-                return hi;
-            }
-        }
-
-        ConnectionUrlParser.Pair<String, Integer> hostAndPort = ConnectionUrlParser.parseHostPortPair(hostPortPair);
-        String host = hostAndPort.left;
-        Integer port = hostAndPort.right;
-        String user = getDefaultUser();
-        String password = getDefaultPassword();
-
-        return buildHostInfo(host, port, user, password, this.properties);
-    }
-
-    /**
-     * Creates a new {@link HostInfo} structure with the given components, passing through the properties transformer if there is one defined in this connection
-     * string;
-     *
-     * @param host
-     *            the host
-     * @param port
-     *            the port
-     * @param user
-     *            the user name
-     * @param password
-     *            the password
-     * @param hostProps
-     *            the host properties map
-     * @return a new instance of {@link HostInfo}
-     */
-    protected HostInfo buildHostInfo(String host, int port, String user, String password, Map<String, String> hostProps) {
-        // Apply properties transformations if needed.
-        if (this.propertiesTransformer != null) {
-            Properties props = new Properties();
-            props.putAll(hostProps);
-
-            props.setProperty(PropertyKey.HOST.getKeyName(), host);
-            props.setProperty(PropertyKey.PORT.getKeyName(), String.valueOf(port));
-            if (user != null) {
-                props.setProperty(PropertyKey.USER.getKeyName(), user);
-            }
-            if (password != null) {
-                props.setProperty(PropertyKey.PASSWORD.getKeyName(), password);
-            }
-
-            Properties transformedProps = this.propertiesTransformer.transformProperties(props);
-
-            host = transformedProps.getProperty(PropertyKey.HOST.getKeyName());
-            try {
-                port = Integer.parseInt(transformedProps.getProperty(PropertyKey.PORT.getKeyName()));
-            } catch (NumberFormatException e) {
-                throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("ConnectionString.8",
-                        new Object[] { PropertyKey.PORT.getKeyName(), transformedProps.getProperty(PropertyKey.PORT.getKeyName()) }), e);
-            }
-            user = transformedProps.getProperty(PropertyKey.USER.getKeyName());
-            password = transformedProps.getProperty(PropertyKey.PASSWORD.getKeyName());
-
-            Map<String, String> transformedHostProps = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-            transformedProps.stringPropertyNames().stream().forEach(k -> transformedHostProps.put(k, transformedProps.getProperty(k)));
-            // Remove surplus keys.
-            transformedHostProps.remove(PropertyKey.HOST.getKeyName());
-            transformedHostProps.remove(PropertyKey.PORT.getKeyName());
-            transformedHostProps.remove(PropertyKey.USER.getKeyName());
-            transformedHostProps.remove(PropertyKey.PASSWORD.getKeyName());
-
-            hostProps = transformedHostProps;
-        }
-
-        return new HostInfo(this, host, port, user, password, hostProps);
-    }
-
-    /**
-     * Returns the original (common to all hosts) connection arguments as provided in the connection string query section.
-     *
-     * @return the original (common to all hosts) connection arguments
-     */
-    public Map<String, String> getOriginalProperties() {
-        return Collections.unmodifiableMap(this.properties);
-    }
-
-    /**
-     * Returns a {@link Properties} instance containing the connection arguments extracted from the URL query section, i.e., per host attributes are excluded.
-     * Applies properties transformations to the collected properties if {@link ConnectionPropertiesTransform} was declared in the connection arguments.
-     *
-     * @return a {@link Properties} instance containing the common connection arguments.
-     */
-    public Properties getConnectionArgumentsAsProperties() {
-        Properties props = new Properties();
-        if (this.properties != null) {
-            props.putAll(this.properties);
-        }
-
-        return this.propertiesTransformer != null ? this.propertiesTransformer.transformProperties(props) : props;
-    }
-
-    /**
-     * Returns a hosts list built from the result of the DNS SRV lookup for the original host name.
-     *
-     * @param srvHost
-     *            the {@link HostInfo} from where to get the DNS SRV service name to lookup.
-     * @return
-     *         the hosts list from the result of the DNS SRV lookup, filtered for the given view.
-     */
-    public List<HostInfo> getHostsListFromDnsSrv(HostInfo srvHost) {
-        String srvServiceName = srvHost.getHost();
-        List<SrvRecord> srvRecords = null;
-
-        try {
-            srvRecords = DnsSrv.lookupSrvRecords(srvServiceName);
-        } catch (NamingException e) {
-            throw ExceptionFactory.createException(Messages.getString("ConnectionString.26", new Object[] { srvServiceName }), e);
-        }
-        if (srvRecords == null || srvRecords.size() == 0) {
-            throw ExceptionFactory.createException(Messages.getString("ConnectionString.26", new Object[] { srvServiceName }));
-        }
-
-        return Collections.unmodifiableList(srvRecordsToHostsList(srvRecords, srvHost));
-    }
-
-    /**
-     * Converts a list of DNS SRV records into a hosts list.
-     *
-     * @param srvRecords
-     *            the list of DNS SRV records.
-     * @param baseHostInfo
-     *            the {@link HostInfo} to use as source of all common host specific options.
-     * @return
-     *         a list of hosts.
-     */
-    private List<HostInfo> srvRecordsToHostsList(List<SrvRecord> srvRecords, HostInfo baseHostInfo) {
-        return srvRecords.stream()
-                .map(s -> buildHostInfo(s.getTarget(), s.getPort(), baseHostInfo.getUser(), baseHostInfo.getPassword(), baseHostInfo.getHostProperties()))
-                .collect(Collectors.toList());
+        return this.hosts.isEmpty() ? null : this.hosts.getFirst();
     }
 
     /**
@@ -824,8 +348,7 @@ public abstract class ConnectionUrl implements DatabaseUrlContainer {
     @Override
     public String toString() {
         StringBuilder asStr = new StringBuilder(super.toString());
-        asStr.append(String.format(" :: {type: \"%s\", hosts: %s, database: \"%s\", properties: %s, propertiesTransformer: %s}", this.type, this.hosts,
-                this.originalDatabase, this.properties, this.propertiesTransformer));
+        asStr.append(String.format(" :: {type: \"%s\", hosts: %s, database: \"%s\", properties: %s}", this.type, this.hosts, this.originalDatabase, this.properties));
         return asStr.toString();
     }
 

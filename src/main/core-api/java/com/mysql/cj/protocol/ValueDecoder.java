@@ -20,6 +20,9 @@
 
 package com.mysql.cj.protocol;
 
+import com.mysql.cj.exceptions.DataConversionException;
+import com.mysql.cj.exceptions.DataReadException;
+import com.mysql.cj.exceptions.NumberOutOfRange;
 import com.mysql.cj.result.Field;
 import com.mysql.cj.result.ValueFactory;
 
@@ -31,42 +34,42 @@ import com.mysql.cj.result.ValueFactory;
  */
 public interface ValueDecoder {
 
-    <T> T decodeDate(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeDate(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws DataReadException;
 
-    <T> T decodeTime(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf);
+    <T> T decodeTime(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf) throws DataReadException;
 
-    <T> T decodeTimestamp(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf);
+    <T> T decodeTimestamp(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf) throws DataReadException;
 
-    <T> T decodeDatetime(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf);
+    <T> T decodeDatetime(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf) throws DataReadException;
 
-    <T> T decodeInt1(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeInt1(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeUInt1(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeUInt1(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeInt2(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeInt2(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeUInt2(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeUInt2(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeInt4(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeInt4(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeUInt4(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeUInt4(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeInt8(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeInt8(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeUInt8(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeUInt8(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeFloat(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeFloat(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeDouble(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeDouble(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeDecimal(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeDecimal(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeByteArray(byte[] bytes, int offset, int length, Field f, ValueFactory<T> vf);
+    <T> T decodeByteArray(byte[] bytes, int offset, int length, Field f, ValueFactory<T> vf) throws DataReadException;
 
-    <T> T decodeBit(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeBit(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException;
 
-    <T> T decodeSet(byte[] bytes, int offset, int length, Field f, ValueFactory<T> vf);
+    <T> T decodeSet(byte[] bytes, int offset, int length, Field f, ValueFactory<T> vf) throws DataReadException;
 
-    <T> T decodeYear(byte[] bytes, int offset, int length, ValueFactory<T> vf);
+    <T> T decodeYear(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws DataReadException;
 
 }

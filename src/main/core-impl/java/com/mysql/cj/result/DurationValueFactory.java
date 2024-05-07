@@ -23,6 +23,7 @@ package com.mysql.cj.result;
 import java.time.Duration;
 
 import com.mysql.cj.conf.PropertySet;
+import com.mysql.cj.exceptions.DataConversionException;
 import com.mysql.cj.protocol.InternalDate;
 import com.mysql.cj.protocol.InternalTime;
 import com.mysql.cj.protocol.InternalTimestamp;
@@ -37,7 +38,7 @@ public class DurationValueFactory extends AbstractDateTimeValueFactory<Duration>
     }
 
     @Override
-    Duration localCreateFromDate(InternalDate idate) {
+    Duration localCreateFromDate(InternalDate idate) throws DataConversionException {
         return unsupported("DATE");
     }
 
@@ -49,12 +50,12 @@ public class DurationValueFactory extends AbstractDateTimeValueFactory<Duration>
     }
 
     @Override
-    public Duration localCreateFromTimestamp(InternalTimestamp its) {
+    public Duration localCreateFromTimestamp(InternalTimestamp its) throws DataConversionException {
         return unsupported("TIMESTAMP");
     }
 
     @Override
-    public Duration localCreateFromDatetime(InternalTimestamp its) {
+    public Duration localCreateFromDatetime(InternalTimestamp its) throws DataConversionException {
         return unsupported("DATETIME");
     }
 

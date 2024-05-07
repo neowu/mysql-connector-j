@@ -39,43 +39,41 @@ public class IntegerValueFactory extends AbstractNumericValueFactory<Integer> {
     }
 
     @Override
-    public Integer createFromBigInteger(BigInteger i) {
-        if (this.jdbcCompliantTruncationForReads
-                && (i.compareTo(Constants.BIG_INTEGER_MIN_INTEGER_VALUE) < 0 || i.compareTo(Constants.BIG_INTEGER_MAX_INTEGER_VALUE) > 0)) {
+    public Integer createFromBigInteger(BigInteger i) throws NumberOutOfRange {
+        if ((i.compareTo(Constants.BIG_INTEGER_MIN_INTEGER_VALUE) < 0 || i.compareTo(Constants.BIG_INTEGER_MAX_INTEGER_VALUE) > 0)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { i, getTargetTypeName() }));
         }
         return i.intValue();
     }
 
     @Override
-    public Integer createFromLong(long l) {
-        if (this.jdbcCompliantTruncationForReads && (l < Integer.MIN_VALUE || l > Integer.MAX_VALUE)) {
+    public Integer createFromLong(long l) throws NumberOutOfRange {
+        if ((l < Integer.MIN_VALUE || l > Integer.MAX_VALUE)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { Long.valueOf(l).toString(), getTargetTypeName() }));
         }
         return (int) l;
     }
 
     @Override
-    public Integer createFromBigDecimal(BigDecimal d) {
-        if (this.jdbcCompliantTruncationForReads
-                && (d.compareTo(Constants.BIG_DECIMAL_MIN_INTEGER_VALUE) < 0 || d.compareTo(Constants.BIG_DECIMAL_MAX_INTEGER_VALUE) > 0)) {
+    public Integer createFromBigDecimal(BigDecimal d) throws NumberOutOfRange {
+        if ((d.compareTo(Constants.BIG_DECIMAL_MIN_INTEGER_VALUE) < 0 || d.compareTo(Constants.BIG_DECIMAL_MAX_INTEGER_VALUE) > 0)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { d, getTargetTypeName() }));
         }
         return (int) d.longValue();
     }
 
     @Override
-    public Integer createFromDouble(double d) {
-        if (this.jdbcCompliantTruncationForReads && (d < Integer.MIN_VALUE || d > Integer.MAX_VALUE)) {
+    public Integer createFromDouble(double d) throws NumberOutOfRange {
+        if ((d < Integer.MIN_VALUE || d > Integer.MAX_VALUE)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { d, getTargetTypeName() }));
         }
         return (int) d;
     }
 
     @Override
-    public Integer createFromBit(byte[] bytes, int offset, int length) {
+    public Integer createFromBit(byte[] bytes, int offset, int length) throws NumberOutOfRange {
         long l = DataTypeUtil.bitToLong(bytes, offset, length);
-        if (this.jdbcCompliantTruncationForReads && l >> 32 != 0) {
+        if (l >> 32 != 0) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { Long.valueOf(l).toString(), getTargetTypeName() }));
         }
         return (int) l;

@@ -20,6 +20,8 @@
 
 package com.mysql.cj;
 
+import com.mysql.cj.exceptions.CJException;
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.Message;
 
 public interface PreparedQuery extends Query {
@@ -28,7 +30,7 @@ public interface PreparedQuery extends Query {
 
     void setQueryInfo(QueryInfo queryInfo);
 
-    void checkNullOrEmptyQuery(String sql);
+    void checkNullOrEmptyQuery(String sql) throws WrongArgumentException;
 
     String getOriginalSql();
 
@@ -38,18 +40,18 @@ public interface PreparedQuery extends Query {
 
     void setParameterCount(int parameterCount);
 
-    public QueryBindings getQueryBindings();
+    QueryBindings getQueryBindings();
 
-    public void setQueryBindings(QueryBindings queryBindings);
+    void setQueryBindings(QueryBindings queryBindings);
 
-    int computeBatchSize(int numBatchedArgs);
+    int computeBatchSize(int numBatchedArgs) throws CJException;
 
     int getBatchCommandIndex();
 
     void setBatchCommandIndex(int batchCommandIndex);
 
-    String asSql();
+    String asSql() throws CJException;
 
-    <M extends Message> M fillSendPacket(QueryBindings bindings);
+    <M extends Message> M fillSendPacket(QueryBindings bindings) throws CJException;
 
 }

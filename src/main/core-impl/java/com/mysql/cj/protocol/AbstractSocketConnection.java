@@ -20,18 +20,12 @@
 
 package com.mysql.cj.protocol;
 
+import com.mysql.cj.Messages;
+import com.mysql.cj.conf.PropertySet;
+
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-
-import com.mysql.cj.Messages;
-import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.exceptions.UnableToConnectException;
-import com.mysql.cj.exceptions.WrongArgumentException;
-import com.mysql.cj.util.Util;
-import com.mysql.jdbc.SocketFactoryWrapper;
 
 public abstract class AbstractSocketConnection implements SocketConnection {
 
@@ -42,7 +36,6 @@ public abstract class AbstractSocketConnection implements SocketConnection {
     protected FullReadInputStream mysqlInput = null;
     protected BufferedOutputStream mysqlOutput = null;
 
-    protected ExceptionInterceptor exceptionInterceptor;
     protected PropertySet propertySet;
 
     @Override
@@ -69,11 +62,6 @@ public abstract class AbstractSocketConnection implements SocketConnection {
     }
 
     @Override
-    public void setMysqlInput(FullReadInputStream mysqlInput) {
-        this.mysqlInput = mysqlInput;
-    }
-
-    @Override
     public BufferedOutputStream getMysqlOutput() throws IOException {
         if (this.mysqlOutput != null) {
             return this.mysqlOutput;
@@ -89,11 +77,6 @@ public abstract class AbstractSocketConnection implements SocketConnection {
     @Override
     public SocketFactory getSocketFactory() {
         return this.socketFactory;
-    }
-
-    @Override
-    public void setSocketFactory(SocketFactory socketFactory) {
-        this.socketFactory = socketFactory;
     }
 
     /**
@@ -118,35 +101,7 @@ public abstract class AbstractSocketConnection implements SocketConnection {
     }
 
     @Override
-    public ExceptionInterceptor getExceptionInterceptor() {
-        return this.exceptionInterceptor;
-    }
-
-    @Override
     public PropertySet getPropertySet() {
         return this.propertySet;
     }
-
-    @SuppressWarnings("deprecation")
-    protected SocketFactory createSocketFactory(String socketFactoryClassName) {
-        if (socketFactoryClassName == null) {
-            throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("SocketConnection.0"), getExceptionInterceptor());
-        }
-
-        try {
-            return Util.getInstance(SocketFactory.class, socketFactoryClassName, null, null, getExceptionInterceptor());
-        } catch (WrongArgumentException e1) {
-            if (e1.getCause() == null) {
-                // Wrap legacy socket factories.
-                try {
-                    return new SocketFactoryWrapper(
-                            Util.getInstance(com.mysql.jdbc.SocketFactory.class, socketFactoryClassName, null, null, getExceptionInterceptor()));
-                } catch (Exception e2) {
-                    throw e1;
-                }
-            }
-            throw e1;
-        }
-    }
-
 }

@@ -30,7 +30,6 @@ import com.mysql.cj.protocol.MessageSender;
  * split into multiple chunks.
  */
 public class SimplePacketSender implements MessageSender<NativePacketPayload> {
-
     private BufferedOutputStream outputStream;
 
     public SimplePacketSender(BufferedOutputStream outputStream) {
@@ -47,15 +46,4 @@ public class SimplePacketSender implements MessageSender<NativePacketPayload> {
         }
         this.outputStream.flush();
     }
-
-    @Override
-    public MessageSender<NativePacketPayload> undecorateAll() {
-        return this;
-    }
-
-    @Override
-    public MessageSender<NativePacketPayload> undecorate() {
-        return this;
-    }
-
 }

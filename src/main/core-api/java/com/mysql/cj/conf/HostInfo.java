@@ -20,12 +20,12 @@
 
 package com.mysql.cj.conf;
 
-import static com.mysql.cj.util.StringUtils.isNullOrEmpty;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
+import static com.mysql.cj.util.StringUtils.isNullOrEmpty;
 
 /**
  * This class holds the following MySQL host information:
@@ -40,7 +40,6 @@ import java.util.Properties;
 public class HostInfo implements DatabaseUrlContainer {
 
     public static final int NO_PORT = -1;
-    private static final String HOST_PORT_SEPARATOR = ":";
 
     private final DatabaseUrlContainer originalUrl;
     private final String host;
@@ -120,15 +119,6 @@ public class HostInfo implements DatabaseUrlContainer {
     }
 
     /**
-     * Returns a host:port representation of this host.
-     *
-     * @return the host:port representation of this host
-     */
-    public String getHostPortPair() {
-        return this.host + HOST_PORT_SEPARATOR + this.port;
-    }
-
-    /**
      * Returns the user name.
      *
      * @return the user name
@@ -205,18 +195,6 @@ public class HostInfo implements DatabaseUrlContainer {
     @Override
     public String getDatabaseUrl() {
         return this.originalUrl != null ? this.originalUrl.getDatabaseUrl() : "";
-    }
-
-    /**
-     * Checks if this {@link HostInfo} has the same host and port pair as the given {@link HostInfo}.
-     *
-     * @param hi
-     *            the {@link HostInfo} to compare with.
-     * @return
-     *         <code>true</code> if both objects have equal host and port pairs, <code>false</code> otherwise.
-     */
-    public boolean equalHostPortPair(HostInfo hi) {
-        return (getHost() != null && getHost().equals(hi.getHost()) || getHost() == null && hi.getHost() == null) && getPort() == hi.getPort();
     }
 
     /**

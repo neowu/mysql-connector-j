@@ -20,10 +20,12 @@
 
 package com.mysql.cj.protocol.a;
 
-import java.io.IOException;
-import java.util.ArrayList;
-
+import com.mysql.cj.Messages;
 import com.mysql.cj.conf.PropertyKey;
+import com.mysql.cj.exceptions.CJCommunicationsException;
+import com.mysql.cj.exceptions.CJException;
+import com.mysql.cj.exceptions.CJPacketTooBigException;
+import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.protocol.ColumnDefinition;
 import com.mysql.cj.protocol.ProtocolEntityFactory;
 import com.mysql.cj.protocol.ProtocolEntityReader;
@@ -34,7 +36,9 @@ import com.mysql.cj.protocol.a.NativeConstants.IntegerDataType;
 import com.mysql.cj.protocol.a.NativeConstants.StringSelfDataType;
 import com.mysql.cj.protocol.a.result.OkPacket;
 import com.mysql.cj.protocol.a.result.ResultsetRowsStatic;
-import com.mysql.cj.protocol.a.result.ResultsetRowsStreaming;
+
+import java.io.IOException;
+import java.util.ArrayList;
 
 public class TextResultsetReader implements ProtocolEntityReader<Resultset, NativePacketPayload> {
 
@@ -45,8 +49,8 @@ public class TextResultsetReader implements ProtocolEntityReader<Resultset, Nati
     }
 
     @Override
-    public Resultset read(int maxRows, boolean streamResults, NativePacketPayload resultPacket, ColumnDefinition metadata,
-            ProtocolEntityFactory<Resultset, NativePacketPayload> resultSetFactory) throws IOException {
+    public Resultset read(NativePacketPayload resultPacket, ColumnDefinition metadata,
+            ProtocolEntityFactory<Resultset, NativePacketPayload> resultSetFactory) throws IOException, CJException {
         Resultset rs = null;
         //try {
         long columnCount = resultPacket.readInteger(IntegerDataType.INT_LENENC);
@@ -65,24 +69,16 @@ public class TextResultsetReader implements ProtocolEntityReader<Resultset, Nati
 
             ResultsetRows rows = null;
 
-            if (!streamResults) {
-                TextRowFactory trf = new TextRowFactory(this.protocol, cdef, resultSetFactory.getResultSetConcurrency(), false);
-                ArrayList<ResultsetRow> rowList = new ArrayList<>();
+            TextRowFactory trf = new TextRowFactory(this.protocol, cdef);
+            ArrayList<ResultsetRow> rowList = new ArrayList<>();
 
-                ResultsetRow row = this.protocol.read(ResultsetRow.class, trf);
-                while (row != null) {
-                    if (maxRows == -1 || rowList.size() < maxRows) {
-                        rowList.add(row);
-                    }
-                    row = this.protocol.read(ResultsetRow.class, trf);
-                }
-
-                rows = new ResultsetRowsStatic(rowList, cdef);
-
-            } else {
-                rows = new ResultsetRowsStreaming<>(this.protocol, cdef, false, resultSetFactory);
-                this.protocol.setStreamingData(rows);
+            ResultsetRow row = this.protocol.read(ResultsetRow.class, trf);
+            while (row != null) {
+                rowList.add(row);
+                row = this.protocol.read(ResultsetRow.class, trf);
             }
+
+            rows = new ResultsetRowsStatic(rowList, cdef);
 
             /*
              * Build ResultSet from ResultsetRows
@@ -95,7 +91,7 @@ public class TextResultsetReader implements ProtocolEntityReader<Resultset, Nati
                 String charEncoding = this.protocol.getPropertySet().getStringProperty(PropertyKey.characterEncoding).getValue();
                 String fileName = resultPacket.readString(StringSelfDataType.STRING_TERM,
                         this.protocol.getServerSession().getCharsetSettings().doesPlatformDbCharsetMatches() ? charEncoding : null);
-                resultPacket = this.protocol.sendFileToServer(fileName);
+                throw ExceptionFactory.createException(Messages.getString("MysqlIO.LoadDataLocalNotAllowed"));
             }
 
             /*

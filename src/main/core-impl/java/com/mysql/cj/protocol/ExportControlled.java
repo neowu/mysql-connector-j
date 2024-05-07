@@ -20,48 +20,18 @@
 
 package com.mysql.cj.protocol;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.Socket;
-import java.net.URL;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.KeyFactory;
-import java.security.KeyManagementException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertPath;
-import java.security.cert.CertPathValidator;
-import java.security.cert.CertPathValidatorException;
-import java.security.cert.CertPathValidatorResult;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.PKIXCertPathValidatorResult;
-import java.security.cert.PKIXParameters;
-import java.security.cert.TrustAnchor;
-import java.security.cert.X509CertSelector;
-import java.security.cert.X509Certificate;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import com.mysql.cj.ServerVersion;
+import com.mysql.cj.conf.PropertyDefinitions.SslMode;
+import com.mysql.cj.conf.PropertyKey;
+import com.mysql.cj.conf.PropertySet;
+import com.mysql.cj.conf.RuntimeProperty;
+import com.mysql.cj.exceptions.CJCommunicationsException;
+import com.mysql.cj.exceptions.ExceptionFactory;
+import com.mysql.cj.exceptions.FeatureNotAvailableException;
+import com.mysql.cj.exceptions.RSAException;
+import com.mysql.cj.exceptions.SSLParamsException;
+import com.mysql.cj.util.Base64Decoder;
+import com.mysql.cj.util.StringUtils;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -79,21 +49,43 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 import javax.security.auth.x500.X500Principal;
-
-import com.mysql.cj.ServerVersion;
-import com.mysql.cj.conf.PropertyDefinitions.SslMode;
-import com.mysql.cj.conf.PropertyKey;
-import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.conf.RuntimeProperty;
-import com.mysql.cj.exceptions.CJCommunicationsException;
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.exceptions.FeatureNotAvailableException;
-import com.mysql.cj.exceptions.RSAException;
-import com.mysql.cj.exceptions.SSLParamsException;
-import com.mysql.cj.log.Log;
-import com.mysql.cj.util.Base64Decoder;
-import com.mysql.cj.util.StringUtils;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.Socket;
+import java.net.URL;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.KeyFactory;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertPath;
+import java.security.cert.CertPathValidator;
+import java.security.cert.CertPathValidatorException;
+import java.security.cert.CertPathValidatorResult;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.PKIXCertPathValidatorResult;
+import java.security.cert.PKIXParameters;
+import java.security.cert.TrustAnchor;
+import java.security.cert.X509CertSelector;
+import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Holds functionality that falls under export-control regulations.
@@ -132,7 +124,7 @@ public class ExportControlled {
             });
             Arrays.stream(tlsSettings.getProperty("TLSCiphers.Unacceptable.Mask").split("\\s*,\\s*")).forEach(s -> UNACCEPTABLE_CIPHER_SUBSTR.add(s.trim()));
         } catch (IOException e) {
-            throw ExceptionFactory.createException("Unable to load TlsSettings.properties");
+            throw new Error("Unable to load TlsSettings.properties", e);
         }
     }
 
@@ -152,20 +144,15 @@ public class ExportControlled {
      *            the Protocol instance containing the socket to convert into an SSLSocket.
      * @param serverVersion
      *            ServerVersion object
-     * @param log
-     *            Logger
-     *
      * @return SSL socket
      *
      * @throws IOException
      *             if an I/O exception occurs
      * @throws SSLParamsException
      *             if the handshake fails
-     * @throws FeatureNotAvailableException
-     *             if TLS is not supported
      */
-    public static Socket performTlsHandshake(Socket rawSocket, SocketConnection socketConnection, ServerVersion serverVersion, Log log)
-            throws IOException, SSLParamsException, FeatureNotAvailableException {
+    public static Socket performTlsHandshake(Socket rawSocket, SocketConnection socketConnection, ServerVersion serverVersion)
+            throws IOException, SSLParamsException, CJCommunicationsException {
         PropertySet pset = socketConnection.getPropertySet();
 
         SslMode sslMode = pset.<SslMode>getEnumProperty(PropertyKey.sslMode).getValue();
@@ -189,7 +176,6 @@ public class ExportControlled {
         sslContextBuilder.setTrustManagerFactoryProvider(pset.getStringProperty(PropertyKey.trustManagerFactoryProvider).getValue());
         sslContextBuilder.setKeyStoreProvider(pset.getStringProperty(PropertyKey.keyStoreProvider).getValue());
         sslContextBuilder.setSslContextProvider(pset.getStringProperty(PropertyKey.sslContextProvider).getValue());
-        sslContextBuilder.setExceptionInterceptor(socketConnection.getExceptionInterceptor());
 
         SSLContext sslContext = sslContextBuilder.build();
         SSLSocketFactory socketFactory = sslContext.getSocketFactory();
@@ -267,37 +253,6 @@ public class ExportControlled {
         }
     }
 
-    public static byte[] encryptWithRSAPublicKey(byte[] source, RSAPublicKey key) throws RSAException {
-        return encryptWithRSAPublicKey(source, key, "RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
-    }
-
-    public static RSAPrivateKey decodeRSAPrivateKey(String key) throws RSAException {
-        if (key == null) {
-            throw ExceptionFactory.createException(RSAException.class, "Key parameter is null");
-        }
-
-        String keyData = key.replace("-----BEGIN PRIVATE KEY-----", "").replaceAll("\\R", "").replace("-----END PRIVATE KEY-----", "");
-        byte[] decodedKeyData = Base64.getDecoder().decode(keyData);
-
-        try {
-            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-            return (RSAPrivateKey) keyFactory.generatePrivate(new PKCS8EncodedKeySpec(decodedKeyData));
-        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-            throw ExceptionFactory.createException(RSAException.class, "Unable to decode private key", e);
-        }
-    }
-
-    public static byte[] sign(byte[] source, RSAPrivateKey privateKey) throws RSAException {
-        try {
-            Signature signature = Signature.getInstance("SHA256withRSA");
-            signature.initSign(privateKey);
-            signature.update(source);
-            return signature.sign();
-        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
-            throw ExceptionFactory.createException(RSAException.class, e.getMessage(), e);
-        }
-    }
-
     private static KeyStoreConfigurations getKeyStoreConfigurations(PropertySet propertySet) {
         String keyStoreUrl = propertySet.getStringProperty(PropertyKey.clientCertificateKeyStoreUrl).getValue();
         String keyStorePassword = propertySet.getStringProperty(PropertyKey.clientCertificateKeyStorePassword).getValue();
@@ -350,7 +305,7 @@ public class ExportControlled {
         return new KeyStoreConfigurations(trustStoreUrl, trustStorePassword, trustStoreType);
     }
 
-    private static String[] getAllowedProtocols(PropertySet pset, String[] socketProtocols) {
+    private static String[] getAllowedProtocols(PropertySet pset, String[] socketProtocols) throws SSLParamsException {
         List<String> tryProtocols = null;
 
         RuntimeProperty<String> tlsVersions = pset.getStringProperty(PropertyKey.tlsVersions);
@@ -375,11 +330,7 @@ public class ExportControlled {
         return allowedProtocols.toArray(new String[0]);
     }
 
-    public static void checkValidProtocols(List<String> protocols) {
-        getValidProtocols(protocols.toArray(new String[0]));
-    }
-
-    private static List<String> getValidProtocols(String[] protocols) {
+    private static List<String> getValidProtocols(String[] protocols) throws SSLParamsException {
         List<String> requestedProtocols = Arrays.stream(protocols).filter(p -> !StringUtils.isNullOrEmpty(p.trim())).collect(Collectors.toList());
         if (requestedProtocols.size() == 0) {
             throw ExceptionFactory.createException(SSLParamsException.class,
@@ -421,7 +372,6 @@ public class ExportControlled {
         private String trustManagerFactoryProvider = null;
         private String keyStoreProvider = null;
         private String sslContextProvider = null;
-        private ExceptionInterceptor exceptionInterceptor = null;
 
         public SslContextBuilder() {
         }
@@ -462,11 +412,7 @@ public class ExportControlled {
             this.sslContextProvider = sslContextProvider;
         }
 
-        public void setExceptionInterceptor(ExceptionInterceptor exceptionInterceptor) {
-            this.exceptionInterceptor = exceptionInterceptor;
-        }
-
-        public SSLContext build() {
+        public SSLContext build() throws SSLParamsException {
             KeyManagerFactory kmf = null;
             KeyManager[] kms = null;
 
@@ -480,10 +426,10 @@ public class ExportControlled {
                         : TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm(), this.trustManagerFactoryProvider);
             } catch (NoSuchAlgorithmException e) {
                 throw ExceptionFactory.createException(SSLParamsException.class,
-                        "Default algorithm for TrustManager or KeyManager is invalid. Check java security properties file.", e, this.exceptionInterceptor);
+                        "Default algorithm for TrustManager or KeyManager is invalid. Check java security properties file.", e);
             } catch (NoSuchProviderException e) {
                 throw ExceptionFactory.createException(SSLParamsException.class,
-                        "Specified TrustManager or KeyManager Provider is invalid. Ensure it is property registered.", e, this.exceptionInterceptor);
+                        "Specified TrustManager or KeyManager Provider is invalid. Ensure it is property registered.", e);
             }
 
             if (!StringUtils.isNullOrEmpty(this.keyStoreSettings.keyStoreUrl)) {
@@ -500,27 +446,23 @@ public class ExportControlled {
                         kms = kmf.getKeyManagers();
                     }
                 } catch (UnrecoverableKeyException e) {
-                    throw ExceptionFactory.createException(SSLParamsException.class, "Could not recover keys from client keystore.  Check password?", e,
-                            this.exceptionInterceptor);
+                    throw ExceptionFactory.createException(SSLParamsException.class, "Could not recover keys from client keystore.  Check password?", e);
                 } catch (NoSuchAlgorithmException e) {
-                    throw ExceptionFactory.createException(SSLParamsException.class, "Unsupported keystore algorithm [" + e.getMessage() + "]", e,
-                            this.exceptionInterceptor);
+                    throw ExceptionFactory.createException(SSLParamsException.class, "Unsupported keystore algorithm [" + e.getMessage() + "]", e);
                 } catch (NoSuchProviderException e) {
                     throw ExceptionFactory.createException(SSLParamsException.class,
-                            "Specified KeyStore Provider is invalid. Ensure it is property registered.", e, this.exceptionInterceptor);
+                            "Specified KeyStore Provider is invalid. Ensure it is property registered.", e);
                 } catch (KeyStoreException e) {
-                    throw ExceptionFactory.createException(SSLParamsException.class, "Could not create KeyStore instance [" + e.getMessage() + "]", e,
-                            this.exceptionInterceptor);
+                    throw ExceptionFactory.createException(SSLParamsException.class, "Could not create KeyStore instance [" + e.getMessage() + "]", e);
                 } catch (CertificateException e) {
                     throw ExceptionFactory.createException(SSLParamsException.class,
-                            "Could not load client" + this.keyStoreSettings.keyStoreType + " keystore from " + this.keyStoreSettings.keyStoreUrl, e,
-                            this.exceptionInterceptor);
+                            "Could not load client" + this.keyStoreSettings.keyStoreType + " keystore from " + this.keyStoreSettings.keyStoreUrl, e);
                 } catch (MalformedURLException e) {
                     throw ExceptionFactory.createException(SSLParamsException.class, this.keyStoreSettings.keyStoreUrl + " does not appear to be a valid URL.",
-                            e, this.exceptionInterceptor);
+                            e);
                 } catch (IOException e) {
                     throw ExceptionFactory.createException(SSLParamsException.class,
-                            "Cannot open " + this.keyStoreSettings.keyStoreUrl + " [" + e.getMessage() + "]", e, this.exceptionInterceptor);
+                            "Cannot open " + this.keyStoreSettings.keyStoreUrl + " [" + e.getMessage() + "]", e);
                 } finally {
                     if (ksIS != null) {
                         try {
@@ -568,24 +510,19 @@ public class ExportControlled {
                     tms = new TrustManager[] { new X509TrustManagerWrapper() };
                 }
             } catch (MalformedURLException e) {
-                throw ExceptionFactory.createException(SSLParamsException.class, this.trustStoreSettings.keyStoreUrl + " does not appear to be a valid URL.", e,
-                        this.exceptionInterceptor);
+                throw ExceptionFactory.createException(SSLParamsException.class, this.trustStoreSettings.keyStoreUrl + " does not appear to be a valid URL.", e);
             } catch (NoSuchAlgorithmException e) {
-                throw ExceptionFactory.createException(SSLParamsException.class, "Unsupported keystore algorithm [" + e.getMessage() + "]", e,
-                        this.exceptionInterceptor);
+                throw ExceptionFactory.createException(SSLParamsException.class, "Unsupported keystore algorithm [" + e.getMessage() + "]", e);
             } catch (NoSuchProviderException e) {
-                throw ExceptionFactory.createException(SSLParamsException.class, "Specified KeyStore Provider is invalid. Ensure it is property registered.", e,
-                        this.exceptionInterceptor);
+                throw ExceptionFactory.createException(SSLParamsException.class, "Specified KeyStore Provider is invalid. Ensure it is property registered.", e);
             } catch (KeyStoreException e) {
-                throw ExceptionFactory.createException(SSLParamsException.class, "Could not create KeyStore instance [" + e.getMessage() + "]", e,
-                        this.exceptionInterceptor);
+                throw ExceptionFactory.createException(SSLParamsException.class, "Could not create KeyStore instance [" + e.getMessage() + "]", e);
             } catch (CertificateException e) {
                 throw ExceptionFactory.createException(SSLParamsException.class,
-                        "Could not load trust" + this.trustStoreSettings.keyStoreType + " keystore from " + this.trustStoreSettings.keyStoreUrl, e,
-                        this.exceptionInterceptor);
+                        "Could not load trust" + this.trustStoreSettings.keyStoreType + " keystore from " + this.trustStoreSettings.keyStoreUrl, e);
             } catch (IOException e) {
                 throw ExceptionFactory.createException(SSLParamsException.class,
-                        "Cannot open " + this.trustStoreSettings.keyStoreUrl + " [" + e.getMessage() + "]", e, this.exceptionInterceptor);
+                        "Cannot open " + this.trustStoreSettings.keyStoreUrl + " [" + e.getMessage() + "]", e);
             } finally {
                 if (trustStoreIS != null) {
                     try {
@@ -598,7 +535,7 @@ public class ExportControlled {
 
             if (this.verifyServerCertificate && !x509TrustManagerFound) {
                 throw ExceptionFactory.createException(SSLParamsException.class,
-                        "Failed setting up server certificate validation because no X.509 Trust Manager was found.", this.exceptionInterceptor);
+                        "Failed setting up server certificate validation because no X.509 Trust Manager was found.");
             }
 
             try {
@@ -609,8 +546,7 @@ public class ExportControlled {
             } catch (NoSuchAlgorithmException nsae) {
                 throw new SSLParamsException(SSL_CONTEXT_PROTOCOL + " is not a valid protocol.", nsae);
             } catch (NoSuchProviderException e) {
-                throw ExceptionFactory.createException(SSLParamsException.class, "Specified SSLContext Provider is invalid. Ensure it is property registered.",
-                        e, this.exceptionInterceptor);
+                throw ExceptionFactory.createException(SSLParamsException.class, "Specified SSLContext Provider is invalid. Ensure it is property registered.", e);
             } catch (KeyManagementException kme) {
                 throw new SSLParamsException("KeyManagementException: " + kme.getMessage(), kme);
             }

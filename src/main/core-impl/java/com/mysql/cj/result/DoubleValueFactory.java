@@ -39,34 +39,30 @@ public class DoubleValueFactory extends AbstractNumericValueFactory<Double> {
     }
 
     @Override
-    public Double createFromBigInteger(BigInteger i) {
-        if (this.jdbcCompliantTruncationForReads && (new BigDecimal(i).compareTo(Constants.BIG_DECIMAL_MAX_NEGATIVE_DOUBLE_VALUE) < 0
-                || new BigDecimal(i).compareTo(Constants.BIG_DECIMAL_MAX_DOUBLE_VALUE) > 0)) {
+    public Double createFromBigInteger(BigInteger i) throws NumberOutOfRange {
+        if ((new BigDecimal(i).compareTo(Constants.BIG_DECIMAL_MAX_NEGATIVE_DOUBLE_VALUE) < 0
+             || new BigDecimal(i).compareTo(Constants.BIG_DECIMAL_MAX_DOUBLE_VALUE) > 0)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { i, getTargetTypeName() }));
         }
         return i.doubleValue();
     }
 
     @Override
-    public Double createFromLong(long l) {
-        if (this.jdbcCompliantTruncationForReads && (l < -Double.MAX_VALUE || l > Double.MAX_VALUE)) {
-            throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { l, getTargetTypeName() }));
-        }
+    public Double createFromLong(long l) throws NumberOutOfRange {
         return (double) l;
     }
 
     @Override
-    public Double createFromBigDecimal(BigDecimal d) {
-        if (this.jdbcCompliantTruncationForReads
-                && (d.compareTo(Constants.BIG_DECIMAL_MAX_NEGATIVE_DOUBLE_VALUE) < 0 || d.compareTo(Constants.BIG_DECIMAL_MAX_DOUBLE_VALUE) > 0)) {
+    public Double createFromBigDecimal(BigDecimal d) throws NumberOutOfRange {
+        if ((d.compareTo(Constants.BIG_DECIMAL_MAX_NEGATIVE_DOUBLE_VALUE) < 0 || d.compareTo(Constants.BIG_DECIMAL_MAX_DOUBLE_VALUE) > 0)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { d, getTargetTypeName() }));
         }
         return d.doubleValue();
     }
 
     @Override
-    public Double createFromDouble(double d) {
-        if (this.jdbcCompliantTruncationForReads && (d < -Double.MAX_VALUE || d > Double.MAX_VALUE)) {
+    public Double createFromDouble(double d) throws NumberOutOfRange {
+        if ((d < -Double.MAX_VALUE || d > Double.MAX_VALUE)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { d, getTargetTypeName() }));
         }
         return d;

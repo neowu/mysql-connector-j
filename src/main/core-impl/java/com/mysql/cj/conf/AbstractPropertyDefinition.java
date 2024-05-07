@@ -22,8 +22,6 @@ package com.mysql.cj.conf;
 
 import java.io.Serializable;
 
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-
 public abstract class AbstractPropertyDefinition<T> implements PropertyDefinition<T>, Serializable {
 
     private static final long serialVersionUID = 2696624840927848766L;
@@ -34,48 +32,36 @@ public abstract class AbstractPropertyDefinition<T> implements PropertyDefinitio
     private T defaultValue;
     private boolean isRuntimeModifiable;
     private String description;
-    private String sinceVersion;
     private String category;
-    private int order;
 
     private int lowerBound;
     private int upperBound;
 
-    public AbstractPropertyDefinition(String name, String camelCaseAlias, T defaultValue, boolean isRuntimeModifiable, String description, String sinceVersion,
-            String category, int orderInCategory) {
+    public AbstractPropertyDefinition(String name, String camelCaseAlias, T defaultValue, boolean isRuntimeModifiable, String description,
+                                      String category) {
         this.name = name;
         this.ccAlias = camelCaseAlias;
         this.setDefaultValue(defaultValue);
         this.setRuntimeModifiable(isRuntimeModifiable);
         this.setDescription(description);
-        this.setSinceVersion(sinceVersion);
         this.setCategory(category);
-        this.setOrder(orderInCategory);
     }
 
-    public AbstractPropertyDefinition(PropertyKey key, T defaultValue, boolean isRuntimeModifiable, String description, String sinceVersion, String category,
-            int orderInCategory) {
+    public AbstractPropertyDefinition(PropertyKey key, T defaultValue, boolean isRuntimeModifiable, String description, String category) {
         this.key = key;
         this.name = key.getKeyName();
         this.ccAlias = key.getCcAlias();
         this.setDefaultValue(defaultValue);
         this.setRuntimeModifiable(isRuntimeModifiable);
         this.setDescription(description);
-        this.setSinceVersion(sinceVersion);
         this.setCategory(category);
-        this.setOrder(orderInCategory);
     }
 
     public AbstractPropertyDefinition(PropertyKey key, T defaultValue, boolean isRuntimeModifiable, String description, String sinceVersion, String category,
-            int orderInCategory, int lowerBound, int upperBound) {
-        this(key, defaultValue, isRuntimeModifiable, description, sinceVersion, category, orderInCategory);
+                                      int lowerBound, int upperBound) {
+        this(key, defaultValue, isRuntimeModifiable, description, category);
         this.setLowerBound(lowerBound);
         this.setUpperBound(upperBound);
-    }
-
-    @Override
-    public boolean hasValueConstraints() {
-        return getAllowableValues() != null && getAllowableValues().length > 0;
     }
 
     @Override
@@ -96,11 +82,6 @@ public abstract class AbstractPropertyDefinition<T> implements PropertyDefinitio
     @Override
     public String getCcAlias() {
         return this.ccAlias;
-    }
-
-    @Override
-    public boolean hasCcAlias() {
-        return this.ccAlias != null && this.ccAlias.length() > 0;
     }
 
     @Override
@@ -131,30 +112,12 @@ public abstract class AbstractPropertyDefinition<T> implements PropertyDefinitio
     }
 
     @Override
-    public String getSinceVersion() {
-        return this.sinceVersion;
-    }
-
-    public void setSinceVersion(String sinceVersion) {
-        this.sinceVersion = sinceVersion;
-    }
-
-    @Override
     public String getCategory() {
         return this.category;
     }
 
     public void setCategory(String category) {
         this.category = category;
-    }
-
-    @Override
-    public int getOrder() {
-        return this.order;
-    }
-
-    public void setOrder(int order) {
-        this.order = order;
     }
 
     @Override
@@ -181,6 +144,6 @@ public abstract class AbstractPropertyDefinition<T> implements PropertyDefinitio
     }
 
     @Override
-    public abstract T parseObject(String value, ExceptionInterceptor exceptionInterceptor);
+    public abstract T parseObject(String value);
 
 }

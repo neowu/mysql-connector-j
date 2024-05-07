@@ -30,7 +30,9 @@ import java.net.SocketException;
 import com.mysql.cj.Messages;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.log.Log;
+import com.mysql.cj.exceptions.CJCommunicationsException;
+import com.mysql.cj.exceptions.FeatureNotAvailableException;
+import com.mysql.cj.exceptions.SSLParamsException;
 
 /**
  * Socket factory for vanilla TCP/IP sockets (the standard)
@@ -172,16 +174,10 @@ public class StandardSocketFactory implements SocketFactory {
         this.rawSocket.setSoTimeout(getRealTimeout(this.socketTimeoutBackup));
     }
 
-    @Override
-    public <T extends Closeable> T performTlsHandshake(SocketConnection socketConnection, ServerSession serverSession) throws IOException {
-        return performTlsHandshake(socketConnection, serverSession, null);
-    }
-
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Closeable> T performTlsHandshake(SocketConnection socketConnection, ServerSession serverSession, Log log) throws IOException {
-        this.sslSocket = ExportControlled.performTlsHandshake(this.rawSocket, socketConnection, serverSession == null ? null : serverSession.getServerVersion(),
-                log);
+    public <T extends Closeable> T performTlsHandshake(SocketConnection socketConnection, ServerSession serverSession) throws IOException, FeatureNotAvailableException, SSLParamsException, CJCommunicationsException {
+        this.sslSocket = ExportControlled.performTlsHandshake(this.rawSocket, socketConnection, serverSession == null ? null : serverSession.getServerVersion());
         return (T) this.sslSocket;
     }
 

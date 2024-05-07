@@ -31,95 +31,6 @@ package com.mysql.cj.protocol;
  */
 public interface Resultset extends ProtocolEntity {
 
-    public enum Concurrency {
-
-        /**
-         * The constant indicating the concurrency mode for a
-         * <code>Resultset</code> object that may NOT be updated.
-         */
-        READ_ONLY(java.sql.ResultSet.CONCUR_READ_ONLY),
-
-        /**
-         * The constant indicating the concurrency mode for a
-         * <code>Resultset</code> object that may be updated.
-         */
-        UPDATABLE(java.sql.ResultSet.CONCUR_UPDATABLE);
-
-        private int value;
-
-        private Concurrency(int jdbcRsConcur) {
-            this.value = jdbcRsConcur;
-        }
-
-        public int getIntValue() {
-            return this.value;
-        }
-
-        public static Concurrency fromValue(int concurMode, Concurrency backupValue) {
-            for (Concurrency c : values()) {
-                if (c.getIntValue() == concurMode) {
-                    return c;
-                }
-            }
-            return backupValue;
-        }
-
-    }
-
-    public enum Type {
-
-        /**
-         * The constant indicating the type for a <code>Resultset</code> object
-         * whose cursor may move only forward.
-         */
-        FORWARD_ONLY(java.sql.ResultSet.TYPE_FORWARD_ONLY),
-
-        /**
-         * The constant indicating the type for a <code>Resultset</code> object
-         * that is scrollable but generally not sensitive to changes to the data
-         * that underlies the <code>Resultset</code>.
-         */
-        SCROLL_INSENSITIVE(java.sql.ResultSet.TYPE_SCROLL_INSENSITIVE),
-
-        /**
-         * The constant indicating the type for a <code>Resultset</code> object
-         * that is scrollable and generally sensitive to changes to the data
-         * that underlies the <code>Resultset</code>.
-         */
-        SCROLL_SENSITIVE(java.sql.ResultSet.TYPE_SCROLL_SENSITIVE);
-
-        private int value;
-
-        private Type(int jdbcRsType) {
-            this.value = jdbcRsType;
-        }
-
-        public int getIntValue() {
-            return this.value;
-        }
-
-        public static Type fromValue(int rsType, Type backupValue) {
-            for (Type t : values()) {
-                if (t.getIntValue() == rsType) {
-                    return t;
-                }
-            }
-            return backupValue;
-        }
-
-    }
-
-    /**
-     * Sometimes the driver doesn't have metadata before consuming the result set rows (because it's cached),
-     * or need to coerce the metadata returned by queries into that required by the particular specification
-     * (eg metadata returned by metadata queries into that required by the JDBC specification).
-     * So it can call this to set it after the fact.
-     *
-     * @param metadata
-     *            field-level metadata for the result set
-     */
-    void setColumnDefinition(ColumnDefinition metadata);
-
     ColumnDefinition getColumnDefinition();
 
     /**
@@ -137,13 +48,6 @@ public interface Resultset extends ProtocolEntity {
     void initRowsWithMetadata();
 
     /**
-     * The id (used when profiling) to identify us
-     *
-     * @return result id
-     */
-    int getResultId();
-
-    /**
      * @param nextResultset
      *            Sets the next result set in the result set chain for multiple result sets.
      */
@@ -156,12 +60,6 @@ public interface Resultset extends ProtocolEntity {
      * @return the next Resultset
      */
     Resultset getNextResultset();
-
-    /**
-     * Clears the reference to the next result set in a multi-result set
-     * "chain".
-     */
-    void clearNextResultset();
 
     /**
      * Returns the update count for this result set (if one exists), otherwise

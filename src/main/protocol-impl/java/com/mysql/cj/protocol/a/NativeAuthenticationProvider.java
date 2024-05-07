@@ -20,23 +20,13 @@
 
 package com.mysql.cj.protocol.a;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-
 import com.mysql.cj.Constants;
 import com.mysql.cj.Messages;
-import com.mysql.cj.callback.MysqlCallbackHandler;
-import com.mysql.cj.callback.UsernameCallback;
 import com.mysql.cj.conf.PropertyDefinitions.SslMode;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.conf.RuntimeProperty;
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
 import com.mysql.cj.exceptions.UnableToConnectException;
 import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.AuthenticationPlugin;
@@ -46,18 +36,16 @@ import com.mysql.cj.protocol.ServerSession;
 import com.mysql.cj.protocol.a.NativeConstants.IntegerDataType;
 import com.mysql.cj.protocol.a.NativeConstants.StringLengthDataType;
 import com.mysql.cj.protocol.a.NativeConstants.StringSelfDataType;
-import com.mysql.cj.protocol.a.authentication.AuthenticationKerberosClient;
-import com.mysql.cj.protocol.a.authentication.AuthenticationLdapSaslClientPlugin;
-import com.mysql.cj.protocol.a.authentication.AuthenticationOciClient;
-import com.mysql.cj.protocol.a.authentication.AuthenticationWebAuthnClient;
 import com.mysql.cj.protocol.a.authentication.CachingSha2PasswordPlugin;
 import com.mysql.cj.protocol.a.authentication.MysqlClearPasswordPlugin;
 import com.mysql.cj.protocol.a.authentication.MysqlNativePasswordPlugin;
-import com.mysql.cj.protocol.a.authentication.MysqlOldPasswordPlugin;
 import com.mysql.cj.protocol.a.authentication.Sha256PasswordPlugin;
 import com.mysql.cj.protocol.a.result.OkPacket;
 import com.mysql.cj.util.StringUtils;
-import com.mysql.cj.util.Util;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class NativeAuthenticationProvider implements AuthenticationProvider<NativePacketPayload> {
 
@@ -70,7 +58,6 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
     private String database;
     private boolean useConnectWithDb;
 
-    private ExceptionInterceptor exceptionInterceptor;
     private PropertySet propertySet;
 
     private Protocol<NativePacketPayload> protocol;
@@ -83,33 +70,19 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
     /**
      * Protocol name of default authentication plugin in client
      */
-    private String clientDefaultAuthenticationPluginName = null;
-    /**
-     * Was the client default authentication plugin explicitly set?
-     */
-    private boolean clientDefaultAuthenticationPluginExplicitelySet = false;
+    private String clientDefaultAuthenticationPluginName = "mysql_native_password";
     /**
      * Protocol name of default authentication plugin in server
      */
     private String serverDefaultAuthenticationPluginName = null;
 
-    /**
-     * A callback for updating the username from the authentication plugin.
-     */
-    private MysqlCallbackHandler callbackHandler = (cb) -> {
-        if (cb instanceof UsernameCallback) {
-            this.username = ((UsernameCallback) cb).getUsername();
-        }
-    };
-
     public NativeAuthenticationProvider() {
     }
 
     @Override
-    public void init(Protocol<NativePacketPayload> prot, PropertySet propSet, ExceptionInterceptor excInterceptor) {
+    public void init(Protocol<NativePacketPayload> prot, PropertySet propSet) {
         this.protocol = prot;
         this.propertySet = propSet;
-        this.exceptionInterceptor = excInterceptor;
     }
 
     /**
@@ -124,7 +97,9 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
      *            database name
      */
     @Override
-    public void connect(String user, String pass, String db) {
+    public void connect(String user, String pass, String db) throws CJException {
+        if (user == null) throw new CJException("user is required");
+
         ServerSession sessState = this.protocol.getServerSession();
         this.username = user;
         this.password = pass;
@@ -137,13 +112,13 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
         int capabilityFlags = capabilities.getCapabilityFlags();
         if ((capabilityFlags & NativeServerSession.CLIENT_SSL) == 0 && sslMode != SslMode.DISABLED && sslMode != SslMode.PREFERRED) {
             // check SSL availability
-            throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("MysqlIO.15"), getExceptionInterceptor());
+            throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("MysqlIO.15"));
         } else if ((capabilityFlags & NativeServerSession.CLIENT_SECURE_CONNECTION) == 0) {
             // TODO: better messaging
-            throw ExceptionFactory.createException(UnableToConnectException.class, "CLIENT_SECURE_CONNECTION is required", getExceptionInterceptor());
+            throw ExceptionFactory.createException(UnableToConnectException.class, "CLIENT_SECURE_CONNECTION is required");
         } else if ((capabilityFlags & NativeServerSession.CLIENT_PLUGIN_AUTH) == 0) {
             // TODO: better messaging
-            throw ExceptionFactory.createException(UnableToConnectException.class, "CLIENT_PLUGIN_AUTH is required", getExceptionInterceptor());
+            throw ExceptionFactory.createException(UnableToConnectException.class, "CLIENT_PLUGIN_AUTH is required");
         }
 
         sessState.setStatusFlags(capabilities.getStatusFlags()); // read status flags (2 bytes)
@@ -155,41 +130,34 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
                 buf.readString(StringLengthDataType.STRING_FIXED, "ASCII", authPluginDataLength - 8) : buf.readString(StringSelfDataType.STRING_TERM, "ASCII"));
         this.seed = fullSeed.toString();
 
-        this.useConnectWithDb = this.database != null && this.database.length() > 0
-                && !this.propertySet.getBooleanProperty(PropertyKey.createDatabaseIfNotExist).getValue();
+        this.useConnectWithDb = this.database != null && this.database.length() > 0;
 
         long clientParam = capabilityFlags & NativeServerSession.CLIENT_LONG_PASSWORD //
-                | (this.propertySet.getBooleanProperty(PropertyKey.useAffectedRows).getValue() ? //
-                        0 : capabilityFlags & NativeServerSession.CLIENT_FOUND_ROWS) //
-                | capabilityFlags & NativeServerSession.CLIENT_LONG_FLAG //
-                | (this.useConnectWithDb ? capabilityFlags & NativeServerSession.CLIENT_CONNECT_WITH_DB : 0) //
-                | (this.propertySet.getBooleanProperty(PropertyKey.useCompression).getValue() ? //
-                        capabilityFlags & NativeServerSession.CLIENT_COMPRESS : 0) //
-                | (this.propertySet.getBooleanProperty(PropertyKey.allowLoadLocalInfile).getValue()
-                        || this.propertySet.getStringProperty(PropertyKey.allowLoadLocalInfileInPath).isExplicitlySet() ? //
-                                capabilityFlags & NativeServerSession.CLIENT_LOCAL_FILES : 0) //
-                | capabilityFlags & NativeServerSession.CLIENT_PROTOCOL_41 //
-                | (this.propertySet.getBooleanProperty(PropertyKey.interactiveClient).getValue() ? //
-                        capabilityFlags & NativeServerSession.CLIENT_INTERACTIVE : 0) //
-                | (this.propertySet.<SslMode>getEnumProperty(PropertyKey.sslMode).getValue() != SslMode.DISABLED ? //
-                        capabilityFlags & NativeServerSession.CLIENT_SSL : 0) //
-                | capabilityFlags & NativeServerSession.CLIENT_TRANSACTIONS // Required to get server status values.
-                | NativeServerSession.CLIENT_SECURE_CONNECTION //
-                | (this.propertySet.getBooleanProperty(PropertyKey.allowMultiQueries).getValue() ? //
-                        capabilityFlags & NativeServerSession.CLIENT_MULTI_STATEMENTS : 0) //
-                | capabilityFlags & NativeServerSession.CLIENT_MULTI_RESULTS // Always allow multiple result sets.
-                | capabilityFlags & NativeServerSession.CLIENT_PS_MULTI_RESULTS // Always allow multiple result sets for SSPS.
-                | NativeServerSession.CLIENT_PLUGIN_AUTH //
-                | (NONE.equals(this.propertySet.getStringProperty(PropertyKey.connectionAttributes).getValue()) ? //
-                        0 : capabilityFlags & NativeServerSession.CLIENT_CONNECT_ATTRS) //
-                | capabilityFlags & NativeServerSession.CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA //
-                | (this.propertySet.getBooleanProperty(PropertyKey.disconnectOnExpiredPasswords).getValue() ? //
-                        0 : capabilityFlags & NativeServerSession.CLIENT_CAN_HANDLE_EXPIRED_PASSWORD) //
-                | (this.propertySet.getBooleanProperty(PropertyKey.trackSessionState).getValue() ? //
-                        capabilityFlags & NativeServerSession.CLIENT_SESSION_TRACK : 0) //
-                | capabilityFlags & NativeServerSession.CLIENT_DEPRECATE_EOF //
-                | capabilityFlags & NativeServerSession.CLIENT_QUERY_ATTRIBUTES //
-                | capabilityFlags & NativeServerSession.CLIENT_MULTI_FACTOR_AUTHENTICATION;
+                           | (this.propertySet.getBooleanProperty(PropertyKey.useAffectedRows).getValue() ? //
+                0 : capabilityFlags & NativeServerSession.CLIENT_FOUND_ROWS) //
+                           | capabilityFlags & NativeServerSession.CLIENT_LONG_FLAG //
+                           | (this.useConnectWithDb ? capabilityFlags & NativeServerSession.CLIENT_CONNECT_WITH_DB : 0) //
+                           | (0) // NativeServerSession.CLIENT_COMPRESS, NativeServerSession.CLIENT_LOCAL_FILES
+                           | capabilityFlags & NativeServerSession.CLIENT_PROTOCOL_41 //
+                           | (0) // NativeServerSession.CLIENT_INTERACTIVE
+                           | (this.propertySet.<SslMode>getEnumProperty(PropertyKey.sslMode).getValue() != SslMode.DISABLED ? //
+                capabilityFlags & NativeServerSession.CLIENT_SSL : 0) //
+                           | capabilityFlags & NativeServerSession.CLIENT_TRANSACTIONS // Required to get server status values.
+                           | NativeServerSession.CLIENT_SECURE_CONNECTION //
+                           | (this.propertySet.getBooleanProperty(PropertyKey.allowMultiQueries).getValue() ? //
+                capabilityFlags & NativeServerSession.CLIENT_MULTI_STATEMENTS : 0) //
+                           | capabilityFlags & NativeServerSession.CLIENT_MULTI_RESULTS // Always allow multiple result sets.
+                           | capabilityFlags & NativeServerSession.CLIENT_PS_MULTI_RESULTS // Always allow multiple result sets for SSPS.
+                           | NativeServerSession.CLIENT_PLUGIN_AUTH //
+                           | (NONE.equals(this.propertySet.getStringProperty(PropertyKey.connectionAttributes).getValue()) ? //
+                0 : capabilityFlags & NativeServerSession.CLIENT_CONNECT_ATTRS) //
+                           | capabilityFlags & NativeServerSession.CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA //
+                           | (this.propertySet.getBooleanProperty(PropertyKey.disconnectOnExpiredPasswords).getValue() ? //
+                0 : capabilityFlags & NativeServerSession.CLIENT_CAN_HANDLE_EXPIRED_PASSWORD) //
+                           | (0) // NativeServerSession.CLIENT_SESSION_TRACK
+                           | capabilityFlags & NativeServerSession.CLIENT_DEPRECATE_EOF //
+                           | capabilityFlags & NativeServerSession.CLIENT_QUERY_ATTRIBUTES //
+                           | capabilityFlags & NativeServerSession.CLIENT_MULTI_FACTOR_AUTHENTICATION;
 
         sessState.setClientParam(clientParam);
 
@@ -199,7 +167,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
         }
 
         if (buf.isOKPacket()) {
-            throw ExceptionFactory.createException(Messages.getString("AuthenticationProvider.UnexpectedAuthenticationApproval"), getExceptionInterceptor());
+            throw ExceptionFactory.createException(Messages.getString("AuthenticationProvider.UnexpectedAuthenticationApproval"));
         }
 
         proceedHandshakeWithPluggableAuthentication(buf);
@@ -218,83 +186,12 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
      * "caching_sha2_password", "mysql_old_password", "authentication_ldap_sasl_client" or "authentication_kerberos_client" from its own getProtocolPluginName()
      * method.
      */
-    @SuppressWarnings("unchecked")
     private void loadAuthenticationPlugins() {
-        // default plugin
-        RuntimeProperty<String> defaultAuthenticationPluginProp = this.propertySet.getStringProperty(PropertyKey.defaultAuthenticationPlugin);
-        String defaultAuthenticationPluginValue = defaultAuthenticationPluginProp.getValue();
-        if (defaultAuthenticationPluginValue == null || "".equals(defaultAuthenticationPluginValue.trim())) {
-            throw ExceptionFactory.createException(WrongArgumentException.class,
-                    Messages.getString("AuthenticationProvider.BadDefaultAuthenticationPlugin", new Object[] { defaultAuthenticationPluginValue }),
-                    getExceptionInterceptor());
-        }
-
-        // disabled plugins
-        String disabledPlugins = this.propertySet.getStringProperty(PropertyKey.disabledAuthenticationPlugins).getValue();
-        List<String> disabledAuthenticationPlugins;
-        if (disabledPlugins != null && !"".equals(disabledPlugins)) {
-            disabledAuthenticationPlugins = StringUtils.split(disabledPlugins, ",", true);
-        } else {
-            disabledAuthenticationPlugins = Collections.EMPTY_LIST;
-        }
-
         this.authenticationPlugins = new HashMap<>();
-        List<AuthenticationPlugin<NativePacketPayload>> pluginsToInit = new LinkedList<>();
-
-        // built-in plugins
-        pluginsToInit.add(new MysqlNativePasswordPlugin());
-        pluginsToInit.add(new MysqlClearPasswordPlugin());
-        pluginsToInit.add(new Sha256PasswordPlugin());
-        pluginsToInit.add(new CachingSha2PasswordPlugin());
-        pluginsToInit.add(new MysqlOldPasswordPlugin());
-        pluginsToInit.add(new AuthenticationLdapSaslClientPlugin());
-        pluginsToInit.add(new AuthenticationKerberosClient());
-        pluginsToInit.add(new AuthenticationOciClient());
-        pluginsToInit.add(new AuthenticationWebAuthnClient());
-
-        // plugins from authenticationPluginClasses connection parameter
-        String authenticationPluginClasses = this.propertySet.getStringProperty(PropertyKey.authenticationPlugins).getValue();
-        if (authenticationPluginClasses != null && !"".equals(authenticationPluginClasses.trim())) {
-            List<String> pluginsToCreate = StringUtils.split(authenticationPluginClasses, ",", true);
-            for (String className : pluginsToCreate) {
-                pluginsToInit.add(Util.getInstance(AuthenticationPlugin.class, className, null, null, getExceptionInterceptor()));
-            }
-        }
-
-        // add plugin instances
-        boolean defaultFound = false;
-        for (AuthenticationPlugin<NativePacketPayload> plugin : pluginsToInit) {
-            String pluginProtocolName = plugin.getProtocolPluginName();
-            String pluginClassName = plugin.getClass().getName();
-            boolean disabledByProtocolName = disabledAuthenticationPlugins.contains(pluginProtocolName);
-            boolean disabledByClassName = disabledAuthenticationPlugins.contains(pluginClassName);
-
-            if (disabledByProtocolName || disabledByClassName) {
-                // check if the default plugin is disabled
-                if (!defaultFound
-                        && (defaultAuthenticationPluginValue.equals(pluginProtocolName) || defaultAuthenticationPluginValue.equals(pluginClassName))) {
-                    throw ExceptionFactory.createException(WrongArgumentException.class,
-                            Messages.getString("AuthenticationProvider.BadDisabledAuthenticationPlugin",
-                                    new Object[] { disabledByClassName ? pluginClassName : pluginProtocolName }),
-                            getExceptionInterceptor());
-                }
-            } else {
-                this.authenticationPlugins.put(pluginProtocolName, plugin);
-                if (!defaultFound
-                        && (defaultAuthenticationPluginValue.equals(pluginProtocolName) || defaultAuthenticationPluginValue.equals(pluginClassName))) {
-                    this.clientDefaultAuthenticationPluginName = pluginProtocolName;
-                    this.clientDefaultAuthenticationPluginExplicitelySet = defaultAuthenticationPluginProp.isExplicitlySet();
-                    defaultFound = true;
-                }
-            }
-        }
-
-        // check if the default plugin is listed
-        if (!defaultFound) {
-            throw ExceptionFactory.createException(WrongArgumentException.class,
-                    Messages.getString("AuthenticationProvider.DefaultAuthenticationPluginIsNotListed", new Object[] { defaultAuthenticationPluginValue }),
-                    getExceptionInterceptor());
-        }
+        this.authenticationPlugins.put(MysqlNativePasswordPlugin.PLUGIN_NAME,new MysqlNativePasswordPlugin());
+        this.authenticationPlugins.put(MysqlClearPasswordPlugin.PLUGIN_NAME,new MysqlClearPasswordPlugin());
+        this.authenticationPlugins.put(Sha256PasswordPlugin.PLUGIN_NAME,new Sha256PasswordPlugin());
+        this.authenticationPlugins.put(CachingSha2PasswordPlugin.PLUGIN_NAME,new CachingSha2PasswordPlugin());
     }
 
     /**
@@ -312,7 +209,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
      * @return null if plugin is not found or authentication plugin instance initialized with current connection properties
      */
     @SuppressWarnings("unchecked")
-    private AuthenticationPlugin<NativePacketPayload> getAuthenticationPlugin(String pluginName) {
+    private AuthenticationPlugin<NativePacketPayload> getAuthenticationPlugin(String pluginName) throws CJException {
         AuthenticationPlugin<NativePacketPayload> plugin = this.authenticationPlugins.get(pluginName);
 
         if (plugin == null) {
@@ -324,12 +221,11 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
                 plugin = plugin.getClass().newInstance();
             } catch (Throwable t) {
                 throw ExceptionFactory.createException(WrongArgumentException.class,
-                        Messages.getString("AuthenticationProvider.BadAuthenticationPlugin", new Object[] { plugin.getClass().getName() }), t,
-                        getExceptionInterceptor());
+                        Messages.getString("AuthenticationProvider.BadAuthenticationPlugin", new Object[] { plugin.getClass().getName() }), t);
             }
         }
 
-        plugin.init(this.protocol, this.callbackHandler);
+        plugin.init(this.protocol);
         return plugin;
     }
 
@@ -339,11 +235,10 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
      * @param plugin
      *            {@link AuthenticationPlugin}
      */
-    private void checkConfidentiality(AuthenticationPlugin<?> plugin) {
+    private void checkConfidentiality(AuthenticationPlugin<?> plugin) throws CJException {
         if (plugin.requiresConfidentiality() && !this.protocol.getSocketConnection().isSSLEstablished()) {
             throw ExceptionFactory.createException(
-                    Messages.getString("AuthenticationProvider.AuthenticationPluginRequiresSSL", new Object[] { plugin.getProtocolPluginName() }),
-                    getExceptionInterceptor());
+                    Messages.getString("AuthenticationProvider.AuthenticationPluginRequiresSSL", new Object[] { plugin.getProtocolPluginName() }));
         }
     }
 
@@ -359,7 +254,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
      *            this method is used during the initial connection.
      *            Otherwise null.
      */
-    private void proceedHandshakeWithPluggableAuthentication(final NativePacketPayload challenge) {
+    private void proceedHandshakeWithPluggableAuthentication(final NativePacketPayload challenge) throws CJException {
         ServerSession serverSession = this.protocol.getServerSession();
 
         if (this.authenticationPlugins == null) {
@@ -379,12 +274,8 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
          * Choose the client-side default authentication plugin, if explicitely specified, otherwise choose the server-side default authentication plugin.
          */
         String pluginName;
-        if (this.clientDefaultAuthenticationPluginExplicitelySet) {
-            pluginName = this.clientDefaultAuthenticationPluginName;
-        } else {
-            pluginName = this.serverDefaultAuthenticationPluginName != null ? this.serverDefaultAuthenticationPluginName
-                    : this.clientDefaultAuthenticationPluginName;
-        }
+        pluginName = this.serverDefaultAuthenticationPluginName != null ? this.serverDefaultAuthenticationPluginName
+                : this.clientDefaultAuthenticationPluginName;
         AuthenticationPlugin<NativePacketPayload> plugin = getAuthenticationPlugin(pluginName);
 
         if (plugin == null) {
@@ -451,7 +342,9 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
                 firstPacket = false;
             } else if (!toServer.isEmpty()) {
                 // write AuthSwitchResponse packet or raw packet(s)
-                toServer.forEach(b -> this.protocol.send(b, b.getPayloadLength()));
+                for (NativePacketPayload payload : toServer) {
+                    this.protocol.send(payload, payload.getPayloadLength());
+                }
             }
 
             /*
@@ -463,7 +356,6 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
                 // read OK packet
                 OkPacket ok = OkPacket.parse(lastReceived, serverSession);
                 serverSession.setStatusFlags(ok.getStatusFlags(), true);
-                serverSession.getServerSessionStateController().setSessionStateChanges(ok.getSessionStateChanges());
 
                 // authentication complete
                 plugin.destroy();
@@ -481,7 +373,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
                     plugin = getAuthenticationPlugin(pluginName);
                     if (plugin == null) {
                         throw ExceptionFactory.createException(WrongArgumentException.class,
-                                Messages.getString("AuthenticationProvider.BadAuthenticationPlugin", new Object[] { pluginName }), getExceptionInterceptor());
+                                Messages.getString("AuthenticationProvider.BadAuthenticationPlugin", new Object[] { pluginName }));
                     }
                 }
 
@@ -501,7 +393,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
                     plugin = getAuthenticationPlugin(pluginName);
                     if (plugin == null) {
                         throw ExceptionFactory.createException(WrongArgumentException.class,
-                                Messages.getString("AuthenticationProvider.BadAuthenticationPlugin", new Object[] { pluginName }), getExceptionInterceptor());
+                                Messages.getString("AuthenticationProvider.BadAuthenticationPlugin", new Object[] { pluginName }));
                     }
                 }
 
@@ -509,10 +401,6 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
                 fromServer = new NativePacketPayload(lastReceived.readBytes(StringSelfDataType.STRING_EOF));
 
             } else {
-                // read raw (from AuthMoreData) packet
-                if (!this.protocol.versionMeetsMinimum(5, 5, 16)) {
-                    lastReceived.setPosition(lastReceived.getPosition() - 1);
-                }
                 fromServer = new NativePacketPayload(lastReceived.readBytes(StringSelfDataType.STRING_EOF));
             }
 
@@ -521,7 +409,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
 
         if (counter == 0) {
             throw ExceptionFactory.createException(WrongArgumentException.class,
-                    Messages.getString("CommunicationsException.TooManyAuthenticationPluginNegotiations"), getExceptionInterceptor());
+                    Messages.getString("CommunicationsException.TooManyAuthenticationPluginNegotiations"));
         }
 
         this.protocol.afterHandshake();
@@ -569,7 +457,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
         return attMap;
     }
 
-    private void appendConnectionAttributes(NativePacketPayload buf, String attributes, String enc) {
+    private void appendConnectionAttributes(NativePacketPayload buf, String attributes, String enc) throws WrongArgumentException {
         NativePacketPayload lb = new NativePacketPayload(100);
         Map<String, String> attMap = getConnectionAttributesMap(attributes);
 
@@ -580,10 +468,6 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
 
         buf.writeInteger(IntegerDataType.INT_LENENC, lb.getPosition());
         buf.writeBytes(StringLengthDataType.STRING_FIXED, lb.getByteBuffer(), 0, lb.getPosition());
-    }
-
-    public ExceptionInterceptor getExceptionInterceptor() {
-        return this.exceptionInterceptor;
     }
 
     /**
@@ -597,7 +481,9 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
      *            database name
      */
     @Override
-    public void changeUser(String user, String pass, String db) {
+    public void changeUser(String user, String pass, String db) throws CJException {
+        if (user == null) throw new CJException("user is required");
+
         this.username = user;
         this.password = pass;
         this.database = db;
@@ -605,7 +491,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
         this.password = null;
     }
 
-    private NativePacketPayload createHandshakeResponsePacket(ServerSession serverSession, String pluginName, NativePacketPayload authData) {
+    private NativePacketPayload createHandshakeResponsePacket(ServerSession serverSession, String pluginName, NativePacketPayload authData) throws WrongArgumentException {
         long clientParam = serverSession.getClientParam();
         int collationIndex = serverSession.getCharsetSettings().configurePreHandshake(false);
         String enc = serverSession.getCharsetSettings().getPasswordCharacterEncoding();
@@ -645,7 +531,7 @@ public class NativeAuthenticationProvider implements AuthenticationProvider<Nati
         return last_sent;
     }
 
-    private NativePacketPayload createChangeUserPacket(ServerSession serverSession, String pluginName, NativePacketPayload authData) {
+    private NativePacketPayload createChangeUserPacket(ServerSession serverSession, String pluginName, NativePacketPayload authData) throws WrongArgumentException {
         // write Auth Response Packet
         long clientParam = serverSession.getClientParam();
         int collationIndex = serverSession.getCharsetSettings().configurePreHandshake(false);

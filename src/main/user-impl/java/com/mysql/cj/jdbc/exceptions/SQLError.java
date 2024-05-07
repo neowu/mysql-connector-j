@@ -20,6 +20,9 @@
 
 package com.mysql.cj.jdbc.exceptions;
 
+import com.mysql.cj.exceptions.MysqlErrorNumbers;
+import com.mysql.cj.util.Util;
+
 import java.sql.BatchUpdateException;
 import java.sql.SQLDataException;
 import java.sql.SQLException;
@@ -28,13 +31,6 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLSyntaxErrorException;
 import java.sql.SQLTransientConnectionException;
-
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.exceptions.MysqlErrorNumbers;
-import com.mysql.cj.jdbc.JdbcConnection;
-import com.mysql.cj.protocol.PacketReceivedTimeHolder;
-import com.mysql.cj.protocol.PacketSentTimeHolder;
-import com.mysql.cj.util.Util;
 
 /**
  * SQLError is a utility class that maps MySQL error codes to SQL error codes as is required by the JDBC spec.
@@ -51,18 +47,18 @@ public class SQLError {
      * SQLTransientConnectionException 40 SQLTransactionRollbackException N/A
      * SQLTimeoutException
      */
-    public static SQLException createSQLException(String message, String sqlState, ExceptionInterceptor interceptor) {
-        return createSQLException(message, sqlState, 0, interceptor);
+    public static SQLException createSQLException(String message, String sqlState) {
+        return createSQLException(message, sqlState, 0);
     }
 
-    public static SQLException createSQLException(String message, ExceptionInterceptor interceptor) {
+    public static SQLException createSQLException(String message) {
         SQLException sqlEx = new SQLException(message);
 
-        return runThroughExceptionInterceptor(interceptor, sqlEx);
+        return sqlEx;
     }
 
-    public static SQLException createSQLException(String message, String sqlState, Throwable cause, ExceptionInterceptor interceptor) {
-        SQLException sqlEx = createSQLException(message, sqlState, null);
+    public static SQLException createSQLException(String message, String sqlState, Throwable cause) {
+        SQLException sqlEx = createSQLException(message, sqlState);
 
         if (sqlEx.getCause() == null) {
             if (cause != null) {
@@ -74,23 +70,18 @@ public class SQLError {
             }
         }
         // Run through the exception interceptor after setting the init cause.
-        return runThroughExceptionInterceptor(interceptor, sqlEx);
+        return sqlEx;
     }
 
-    public static SQLException createSQLException(String message, String sqlState, int vendorErrorCode, ExceptionInterceptor interceptor) {
-        return createSQLException(message, sqlState, vendorErrorCode, false, interceptor);
+    public static SQLException createSQLException(String message, String sqlState, int vendorErrorCode) {
+        return createSQLException(message, sqlState, vendorErrorCode, false);
     }
 
-    public static SQLException createSQLException(String message, String sqlState, int vendorErrorCode, Throwable cause, ExceptionInterceptor interceptor) {
-        return createSQLException(message, sqlState, vendorErrorCode, false, cause, interceptor);
+    public static SQLException createSQLException(String message, String sqlState, int vendorErrorCode, boolean isTransient) {
+        return createSQLException(message, sqlState, vendorErrorCode, isTransient, null);
     }
 
-    public static SQLException createSQLException(String message, String sqlState, int vendorErrorCode, boolean isTransient, ExceptionInterceptor interceptor) {
-        return createSQLException(message, sqlState, vendorErrorCode, isTransient, null, interceptor);
-    }
-
-    public static SQLException createSQLException(String message, String sqlState, int vendorErrorCode, boolean isTransient, Throwable cause,
-            ExceptionInterceptor interceptor) {
+    public static SQLException createSQLException(String message, String sqlState, int vendorErrorCode, boolean isTransient, Throwable cause) {
         try {
             SQLException sqlEx = null;
 
@@ -132,34 +123,19 @@ public class SQLError {
                 }
             }
 
-            return runThroughExceptionInterceptor(interceptor, sqlEx);
+            return sqlEx;
 
         } catch (Exception sqlEx) {
             SQLException unexpectedEx = new SQLException(
                     "Unable to create correct SQLException class instance, error class/codes may be incorrect. Reason: " + Util.stackTraceToString(sqlEx),
                     MysqlErrorNumbers.SQL_STATE_GENERAL_ERROR);
 
-            return runThroughExceptionInterceptor(interceptor, unexpectedEx);
+            return unexpectedEx;
 
         }
     }
 
-    public static SQLException createCommunicationsException(JdbcConnection conn, PacketSentTimeHolder packetSentTimeHolder,
-            PacketReceivedTimeHolder packetReceivedTimeHolder, Exception underlyingException, ExceptionInterceptor interceptor) {
-        SQLException exToReturn = new CommunicationsException(conn, packetSentTimeHolder, packetReceivedTimeHolder, underlyingException);
-
-        if (underlyingException != null) {
-            try {
-                exToReturn.initCause(underlyingException);
-            } catch (Throwable t) {
-                // we're not going to muck with that here, since it's an error condition anyway!
-            }
-        }
-
-        return runThroughExceptionInterceptor(interceptor, exToReturn);
-    }
-
-    public static SQLException createCommunicationsException(String message, Throwable underlyingException, ExceptionInterceptor interceptor) {
+    public static SQLException createCommunicationsException(String message, Throwable underlyingException) {
         SQLException exToReturn = null;
 
         exToReturn = new CommunicationsException(message, underlyingException);
@@ -172,27 +148,7 @@ public class SQLError {
             }
         }
 
-        return runThroughExceptionInterceptor(interceptor, exToReturn);
-    }
-
-    /**
-     * Run exception through an ExceptionInterceptor chain.
-     *
-     * @param exInterceptor
-     *            exception interceptor
-     * @param sqlEx
-     *            cause
-     * @return SQLException
-     */
-    private static SQLException runThroughExceptionInterceptor(ExceptionInterceptor exInterceptor, SQLException sqlEx) {
-        if (exInterceptor != null) {
-            SQLException interceptedEx = (SQLException) exInterceptor.interceptException(sqlEx);
-
-            if (interceptedEx != null) {
-                return interceptedEx;
-            }
-        }
-        return sqlEx;
+        return exToReturn;
     }
 
     /**
@@ -202,18 +158,16 @@ public class SQLError {
      *            underlying exception
      * @param updateCounts
      *            update counts of completed queries in this batch
-     * @param interceptor
-     *            exception interceptor
      * @return SQLException
      * @throws SQLException
      *             if an error occurs
      */
-    public static SQLException createBatchUpdateException(SQLException underlyingEx, long[] updateCounts, ExceptionInterceptor interceptor)
+    public static SQLException createBatchUpdateException(SQLException underlyingEx, long[] updateCounts)
             throws SQLException {
         // TODO should not throw SQLException
         SQLException newEx = new BatchUpdateException(underlyingEx.getMessage(), underlyingEx.getSQLState(), underlyingEx.getErrorCode(), updateCounts,
                 underlyingEx);
-        return runThroughExceptionInterceptor(interceptor, newEx);
+        return newEx;
     }
 
     /**
@@ -222,7 +176,7 @@ public class SQLError {
      * @return SQLException
      */
     public static SQLException createSQLFeatureNotSupportedException() {
-        return new SQLFeatureNotSupportedException();
+        return new SQLFeatureNotSupportedException("feature not supported");
     }
 
     /**
@@ -232,15 +186,11 @@ public class SQLError {
      *            error message
      * @param sqlState
      *            sqlState
-     * @param interceptor
-     *            exception interceptor
      * @return SQLException
-     * @throws SQLException
-     *             if an error occurs
      */
-    public static SQLException createSQLFeatureNotSupportedException(String message, String sqlState, ExceptionInterceptor interceptor) throws SQLException {
+    public static SQLException createSQLFeatureNotSupportedException(String message, String sqlState) {
         SQLException newEx = new SQLFeatureNotSupportedException(message, sqlState);
-        return runThroughExceptionInterceptor(interceptor, newEx);
+        return newEx;
     }
 
 }

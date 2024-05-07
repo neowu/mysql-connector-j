@@ -20,10 +20,14 @@
 
 package com.mysql.cj.util;
 
+import com.mysql.cj.Messages;
+import com.mysql.cj.MysqlType;
+import com.mysql.cj.exceptions.CJException;
+import com.mysql.cj.exceptions.ExceptionFactory;
+import com.mysql.cj.exceptions.InvalidConnectionAttributeException;
+import com.mysql.cj.exceptions.WrongArgumentException;
+
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.sql.Time;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
@@ -33,27 +37,15 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
-import java.util.Calendar;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.TimeZone;
 import java.util.regex.Pattern;
 
-import com.mysql.cj.Messages;
-import com.mysql.cj.MysqlType;
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.exceptions.InvalidConnectionAttributeException;
-import com.mysql.cj.exceptions.WrongArgumentException;
-
 /**
  * Time zone conversion routines and other time related methods
  */
 public class TimeUtil {
-
-    static final TimeZone GMT_TIMEZONE = TimeZone.getTimeZone("GMT");
-
-    public static final LocalDate DEFAULT_DATE = LocalDate.of(1970, 1, 1);
     public static final LocalTime DEFAULT_TIME = LocalTime.of(0, 0);
 
     public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -64,7 +56,6 @@ public class TimeUtil {
     public static final DateTimeFormatter TIME_FORMATTER_WITH_OPTIONAL_MICROS = new DateTimeFormatterBuilder().appendPattern("HH:mm:ss")
             .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true).toFormatter();
     public static final DateTimeFormatter DATETIME_FORMATTER_NO_FRACT_NO_OFFSET = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    public static final DateTimeFormatter DATETIME_FORMATTER_WITH_MILLIS_NO_OFFSET = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
     public static final DateTimeFormatter DATETIME_FORMATTER_WITH_NANOS_NO_OFFSET = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
     public static final DateTimeFormatter DATETIME_FORMATTER_NO_FRACT_WITH_OFFSET = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXXX");
     public static final DateTimeFormatter DATETIME_FORMATTER_WITH_NANOS_WITH_OFFSET = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSSSSXXX");
@@ -96,47 +87,15 @@ public class TimeUtil {
 
     private static Properties timeZoneMappings = null;
 
-    protected final static Method systemNanoTimeMethod;
-
-    static {
-        Method aMethod;
-
-        try {
-            aMethod = System.class.getMethod("nanoTime", (Class[]) null);
-        } catch (SecurityException | NoSuchMethodException e) {
-            aMethod = null;
-        }
-
-        systemNanoTimeMethod = aMethod;
-    }
-
-    public static boolean nanoTimeAvailable() {
-        return systemNanoTimeMethod != null;
-    }
-
-    public static long getCurrentTimeNanosOrMillis() {
-        if (systemNanoTimeMethod != null) {
-            try {
-                return ((Long) systemNanoTimeMethod.invoke(null, (Object[]) null)).longValue();
-            } catch (IllegalArgumentException | IllegalAccessException | InvocationTargetException e) {
-                // ignore - fall through to currentTimeMillis()
-            }
-        }
-
-        return System.currentTimeMillis();
-    }
-
     /**
      * Returns the 'official' Java timezone name for the given timezone
      *
      * @param timezoneStr
      *            the 'common' timezone name
-     * @param exceptionInterceptor
-     *            exception interceptor
      *
      * @return the Java timezone name for the given timezone
      */
-    public static String getCanonicalTimeZone(String timezoneStr, ExceptionInterceptor exceptionInterceptor) {
+    public static String getCanonicalTimeZone(String timezoneStr) throws CJException {
         if (timezoneStr == null) {
             return null;
         }
@@ -152,7 +111,7 @@ public class TimeUtil {
 
         synchronized (TimeUtil.class) {
             if (timeZoneMappings == null) {
-                loadTimeZoneMappings(exceptionInterceptor);
+                loadTimeZoneMappings();
             }
         }
 
@@ -162,7 +121,7 @@ public class TimeUtil {
         }
 
         throw ExceptionFactory.createException(InvalidConnectionAttributeException.class,
-                Messages.getString("TimeUtil.UnrecognizedTimeZoneId", new Object[] { timezoneStr }), exceptionInterceptor);
+                Messages.getString("TimeUtil.UnrecognizedTimeZoneId", new Object[] { timezoneStr }));
     }
 
     /**
@@ -172,19 +131,15 @@ public class TimeUtil {
      *            an original Timestamp object, not modified by this method
      * @param fsp
      *            value in the range from 0 to 6 specifying fractional seconds precision
-     * @param serverRoundFracSecs
-     *            Flag indicating whether rounding or truncation occurs on server when inserting a TIME, DATE, or TIMESTAMP value with a fractional seconds part
-     *            into a column having the same type but fewer fractional digits: true means rounding, false means truncation. The proper value should be
-     *            detected by analyzing sql_mode server variable for TIME_TRUNCATE_FRACTIONAL presence.
      * @return A new Timestamp object cloned from the original one and then rounded or truncated according to required fsp value
      */
-    public static Timestamp adjustNanosPrecision(Timestamp ts, int fsp, boolean serverRoundFracSecs) {
+    public static Timestamp adjustNanosPrecision(Timestamp ts, int fsp) throws WrongArgumentException {
         if (fsp < 0 || fsp > 6) {
             throw ExceptionFactory.createException(WrongArgumentException.class, "fsp value must be in 0 to 6 range.");
         }
         Timestamp res = (Timestamp) ts.clone();
         double tail = Math.pow(10, 9 - fsp);
-        int nanos = serverRoundFracSecs ? (int) Math.round(res.getNanos() / tail) * (int) tail : (int) (res.getNanos() / tail) * (int) tail;
+        int nanos = (int) Math.round(res.getNanos() / tail) * (int) tail;
         if (nanos > 999999999) { // if rounded up to the second then increment seconds
             nanos %= 1000000000; // get last 9 digits
             res.setTime(res.getTime() + 1000); // increment seconds
@@ -200,20 +155,16 @@ public class TimeUtil {
      *            an original LocalDateTime object, not modified by this method
      * @param fsp
      *            value in the range from 0 to 6 specifying fractional seconds precision
-     * @param serverRoundFracSecs
-     *            Flag indicating whether rounding or truncation occurs on server when inserting a TIME, DATE, or TIMESTAMP value with a fractional seconds part
-     *            into a column having the same type but fewer fractional digits: true means rounding, false means truncation. The proper value should be
-     *            detected by analyzing sql_mode server variable for TIME_TRUNCATE_FRACTIONAL presence.
      * @return A new LocalDateTime object cloned from the original one and then rounded or truncated according to required fsp value
      */
-    public static LocalDateTime adjustNanosPrecision(LocalDateTime x, int fsp, boolean serverRoundFracSecs) {
+    public static LocalDateTime adjustNanosPrecision(LocalDateTime x, int fsp) throws WrongArgumentException {
         if (fsp < 0 || fsp > 6) {
             throw ExceptionFactory.createException(WrongArgumentException.class, "fsp value must be in 0 to 6 range.");
         }
         int originalNano = x.getNano();
         double tail = Math.pow(10, 9 - fsp);
 
-        int adjustedNano = serverRoundFracSecs ? (int) Math.round(originalNano / tail) * (int) tail : (int) (originalNano / tail) * (int) tail;
+        int adjustedNano = (int) Math.round(originalNano / tail) * (int) tail;
         if (adjustedNano > 999999999) { // if rounded up to the second then increment seconds
             adjustedNano %= 1000000000;
             x = x.plusSeconds(1);
@@ -221,14 +172,14 @@ public class TimeUtil {
         return x.withNano(adjustedNano);
     }
 
-    public static LocalTime adjustNanosPrecision(LocalTime x, int fsp, boolean serverRoundFracSecs) {
+    public static LocalTime adjustNanosPrecision(LocalTime x, int fsp) throws WrongArgumentException {
         if (fsp < 0 || fsp > 6) {
             throw ExceptionFactory.createException(WrongArgumentException.class, "fsp value must be in 0 to 6 range.");
         }
         int originalNano = x.getNano();
         double tail = Math.pow(10, 9 - fsp);
 
-        int adjustedNano = serverRoundFracSecs ? (int) Math.round(originalNano / tail) * (int) tail : (int) (originalNano / tail) * (int) tail;
+        int adjustedNano = (int) Math.round(originalNano / tail) * (int) tail;
         if (adjustedNano > 999999999) { // if rounded up to the second then increment seconds
             adjustedNano %= 1000000000;
             x = x.plusSeconds(1);
@@ -236,14 +187,14 @@ public class TimeUtil {
         return x.withNano(adjustedNano);
     }
 
-    public static Duration adjustNanosPrecision(Duration x, int fsp, boolean serverRoundFracSecs) {
+    public static Duration adjustNanosPrecision(Duration x, int fsp) throws WrongArgumentException {
         if (fsp < 0 || fsp > 6) {
             throw ExceptionFactory.createException(WrongArgumentException.class, "fsp value must be in 0 to 6 range.");
         }
         int originalNano = x.getNano();
         double tail = Math.pow(10, 9 - fsp);
 
-        int adjustedNano = serverRoundFracSecs ? (int) Math.round(originalNano / tail) * (int) tail : (int) (originalNano / tail) * (int) tail;
+        int adjustedNano = (int) Math.round(originalNano / tail) * (int) tail;
         if (adjustedNano > 999999999) { // if rounded up to the second then increment seconds
             adjustedNano %= 1000000000;
             x = x.plusSeconds(1);
@@ -261,7 +212,7 @@ public class TimeUtil {
      *            required fractional part length
      * @return fractional seconds part as a string
      */
-    public static String formatNanos(int nanos, int fsp) {
+    public static String formatNanos(int nanos, int fsp) throws WrongArgumentException {
         return formatNanos(nanos, fsp, true);
     }
 
@@ -277,7 +228,7 @@ public class TimeUtil {
      *            whether to remove trailing zero characters in a fractional part after formatting
      * @return fractional seconds part as a string
      */
-    public static String formatNanos(int nanos, int fsp, boolean truncateTrailingZeros) {
+    public static String formatNanos(int nanos, int fsp, boolean truncateTrailingZeros) throws WrongArgumentException {
         if (nanos < 0 || nanos > 999999999) {
             throw ExceptionFactory.createException(WrongArgumentException.class, "nanos value must be in 0 to 999999999 range but was " + nanos);
         }
@@ -312,16 +263,13 @@ public class TimeUtil {
 
     /**
      * Loads a properties file that contains all kinds of time zone mappings.
-     *
-     * @param exceptionInterceptor
-     *            exception interceptor
      */
-    private static void loadTimeZoneMappings(ExceptionInterceptor exceptionInterceptor) {
+    private static void loadTimeZoneMappings() throws CJException {
         timeZoneMappings = new Properties();
         try {
             timeZoneMappings.load(TimeUtil.class.getResourceAsStream(TIME_ZONE_MAPPINGS_RESOURCE));
         } catch (IOException e) {
-            throw ExceptionFactory.createException(Messages.getString("TimeUtil.LoadTimeZoneMappingError"), exceptionInterceptor);
+            throw ExceptionFactory.createException(Messages.getString("TimeUtil.LoadTimeZoneMappingError"));
         }
         // bridge all Time Zone ids known by Java
         for (String tz : TimeZone.getAvailableIDs()) {
@@ -329,21 +277,6 @@ public class TimeUtil {
                 timeZoneMappings.put(tz, tz);
             }
         }
-    }
-
-    public static Timestamp truncateFractionalSeconds(Timestamp timestamp) {
-        Timestamp truncatedTimestamp = new Timestamp(timestamp.getTime());
-        truncatedTimestamp.setNanos(0);
-        return truncatedTimestamp;
-    }
-
-    public static Time truncateFractionalSeconds(Time time) {
-        Time truncatedTime = new Time(time.getTime() / 1000 * 1000);
-        return truncatedTime;
-    }
-
-    public static Boolean hasFractionalSeconds(Time t) {
-        return t.getTime() % 1000 > 0;
     }
 
     /**
@@ -369,28 +302,7 @@ public class TimeUtil {
         return sdf;
     }
 
-    /**
-     * Get SimpleDateFormat where a default Calendar is replaced with a clone of the provided one.
-     * <p>
-     * Note: Don't cache the SimpleDateFormat object returned by this method. Other methods could rely on assumption that the cached SimpleDateFormat has a
-     * default Calendar and that it is safe to change only it's time zone (see {@link #getSimpleDateFormat(SimpleDateFormat, String, TimeZone)}.
-     *
-     * @param pattern
-     *            format pattern
-     * @param cal
-     *            {@link Calendar} object which clone is replacing the default Calendar
-     * @return {@link SimpleDateFormat} object
-     */
-    public static SimpleDateFormat getSimpleDateFormat(String pattern, Calendar cal) {
-        SimpleDateFormat sdf = new SimpleDateFormat(pattern, Locale.US);
-        if (cal != null) {
-            cal = (Calendar) cal.clone();
-            sdf.setCalendar(cal);
-        }
-        return sdf;
-    }
-
-    public static Object parseToDateTimeObject(String s, MysqlType targetMysqlType) {
+    public static Object parseToDateTimeObject(String s, MysqlType targetMysqlType) throws WrongArgumentException {
         if (DATE_LITERAL_WITH_DELIMITERS.matcher(s).matches()) {
             return LocalDate.parse(getCanonicalDate(s), DateTimeFormatter.ISO_LOCAL_DATE);
 
@@ -483,11 +395,7 @@ public class TimeUtil {
 
     private static String getCanonicalDateTime(String s) {
         String[] sa = s.split("[ T]");
-        StringBuilder sb = new StringBuilder();
-        sb.append(getCanonicalDate(sa[0]));
-        sb.append(" ");
-        sb.append(getCanonicalTime(sa[1]));
-        return sb.toString();
+        return getCanonicalDate(sa[0]) + " " + getCanonicalTime(sa[1]);
     }
 
     public static String getDurationString(Duration x) {

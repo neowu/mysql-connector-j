@@ -20,11 +20,11 @@
 
 package com.mysql.cj.result;
 
+import com.mysql.cj.protocol.ColumnDefinition;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
-
-import com.mysql.cj.protocol.ColumnDefinition;
 
 /**
  * Protocol::ColumnDefinition41 object
@@ -46,13 +46,7 @@ public class DefaultColumnDefinition implements ColumnDefinition {
     /** Map of fully-specified column names to column indices */
     private Map<String, Integer> fullColumnNameToIndex = null;
 
-    /** Map column names (and all of their permutations) to column indices */
-    private Map<String, Integer> columnNameToIndex = null;
-
     private boolean builtIndexMapping = false;
-
-    public DefaultColumnDefinition() {
-    }
 
     public DefaultColumnDefinition(Field[] fields) {
         this.fields = fields;
@@ -77,7 +71,6 @@ public class DefaultColumnDefinition implements ColumnDefinition {
         int numFields = this.fields.length;
         this.columnLabelToIndex = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         this.fullColumnNameToIndex = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        this.columnNameToIndex = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 
         // We do this in reverse order, so that the 'first' column with a given name ends up as the final mapping in the hashtable...
         //
@@ -88,7 +81,6 @@ public class DefaultColumnDefinition implements ColumnDefinition {
         //
         for (int i = numFields - 1; i >= 0; i--) {
             Integer index = Integer.valueOf(i);
-            String columnName = this.fields[i].getOriginalName();
             String columnLabel = this.fields[i].getName();
             String fullColumnName = this.fields[i].getFullName();
 
@@ -98,10 +90,6 @@ public class DefaultColumnDefinition implements ColumnDefinition {
 
             if (fullColumnName != null) {
                 this.fullColumnNameToIndex.put(fullColumnName, index);
-            }
-
-            if (columnName != null) {
-                this.columnNameToIndex.put(columnName, index);
             }
         }
 
@@ -115,62 +103,12 @@ public class DefaultColumnDefinition implements ColumnDefinition {
     }
 
     @Override
-    public Map<String, Integer> getColumnLabelToIndex() {
-        return this.columnLabelToIndex;
-    }
-
-    @Override
-    public void setColumnLabelToIndex(Map<String, Integer> columnLabelToIndex) {
-        this.columnLabelToIndex = columnLabelToIndex;
-    }
-
-    @Override
-    public Map<String, Integer> getFullColumnNameToIndex() {
-        return this.fullColumnNameToIndex;
-    }
-
-    @Override
-    public void setFullColumnNameToIndex(Map<String, Integer> fullColNameToIndex) {
-        this.fullColumnNameToIndex = fullColNameToIndex;
-    }
-
-    @Override
-    public Map<String, Integer> getColumnNameToIndex() {
-        return this.columnNameToIndex;
-    }
-
-    @Override
-    public void setColumnNameToIndex(Map<String, Integer> colNameToIndex) {
-        this.columnNameToIndex = colNameToIndex;
-    }
-
-    @Override
-    public Map<String, Integer> getColumnToIndexCache() {
-        return this.columnToIndexCache;
-    }
-
-    @Override
     public void setColumnToIndexCache(Map<String, Integer> columnToIndexCache) {
         this.columnToIndexCache = columnToIndexCache;
     }
 
     @Override
-    public void initializeFrom(ColumnDefinition columnDefinition) {
-        this.fields = columnDefinition.getFields();
-        this.columnLabelToIndex = columnDefinition.getColumnNameToIndex();
-        this.fullColumnNameToIndex = columnDefinition.getFullColumnNameToIndex();
-        this.builtIndexMapping = true;
-    }
-
-    @Override
-    public void exportTo(ColumnDefinition columnDefinition) {
-        columnDefinition.setFields(this.fields);
-        columnDefinition.setColumnNameToIndex(this.columnLabelToIndex);
-        columnDefinition.setFullColumnNameToIndex(this.fullColumnNameToIndex);
-    }
-
-    @Override
-    public int findColumn(String columnName, boolean useColumnNamesInFindColumn, int indexBase) {
+    public int findColumn(String columnName, int indexBase) {
         Integer index;
 
         if (!hasBuiltIndexMapping()) {
@@ -184,10 +122,6 @@ public class DefaultColumnDefinition implements ColumnDefinition {
         }
 
         index = this.columnLabelToIndex.get(columnName);
-
-        if (index == null && useColumnNamesInFindColumn) {
-            index = this.columnNameToIndex.get(columnName);
-        }
 
         if (index == null) {
             index = this.fullColumnNameToIndex.get(columnName);

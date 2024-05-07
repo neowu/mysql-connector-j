@@ -20,12 +20,13 @@
 
 package com.mysql.cj.protocol.a.result;
 
-import com.mysql.cj.exceptions.ExceptionInterceptor;
+import com.mysql.cj.exceptions.DataReadException;
 import com.mysql.cj.protocol.ValueDecoder;
-import com.mysql.cj.protocol.a.MysqlBinaryValueDecoder;
 import com.mysql.cj.protocol.a.MysqlTextValueDecoder;
 import com.mysql.cj.protocol.result.AbstractResultsetRow;
 import com.mysql.cj.result.ValueFactory;
+
+import java.sql.SQLException;
 
 /**
  * A RowHolder implementation that is for cached results (a-la mysql_store_result()).
@@ -34,23 +35,18 @@ public class ByteArrayRow extends AbstractResultsetRow {
 
     byte[][] internalRowData;
 
-    public ByteArrayRow(byte[][] internalRowData, ExceptionInterceptor exceptionInterceptor, ValueDecoder valueDecoder) {
-        super(exceptionInterceptor);
+    public ByteArrayRow(byte[][] internalRowData, ValueDecoder valueDecoder) {
+        super();
 
         this.internalRowData = internalRowData;
         this.valueDecoder = valueDecoder;
     }
 
-    public ByteArrayRow(byte[][] internalRowData, ExceptionInterceptor exceptionInterceptor) {
-        super(exceptionInterceptor);
+    public ByteArrayRow(byte[][] internalRowData) {
+        super();
 
         this.internalRowData = internalRowData;
         this.valueDecoder = new MysqlTextValueDecoder();
-    }
-
-    @Override
-    public boolean isBinaryEncoded() {
-        return this.valueDecoder instanceof MysqlBinaryValueDecoder;
     }
 
     @Override
@@ -59,11 +55,6 @@ public class ByteArrayRow extends AbstractResultsetRow {
             return null;
         }
         return this.internalRowData[index];
-    }
-
-    @Override
-    public void setBytes(int index, byte[] value) {
-        this.internalRowData[index] = value;
     }
 
     @Override
@@ -76,7 +67,7 @@ public class ByteArrayRow extends AbstractResultsetRow {
      * Implementation of getValue() based on the underlying byte array. Delegate to superclass for decoding.
      */
     @Override
-    public <T> T getValue(int columnIndex, ValueFactory<T> vf) {
+    public <T> T getValue(int columnIndex, ValueFactory<T> vf) throws SQLException {
         byte[] columnData = this.internalRowData[columnIndex];
         int length = columnData == null ? 0 : columnData.length;
         return getValueFromBytes(columnIndex, columnData, 0, length, vf);

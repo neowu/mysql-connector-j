@@ -24,6 +24,7 @@ import com.mysql.cj.Messages;
 import com.mysql.cj.ServerVersion;
 import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.exceptions.UnableToConnectException;
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.ServerCapabilities;
 import com.mysql.cj.protocol.a.NativeConstants.IntegerDataType;
 import com.mysql.cj.protocol.a.NativeConstants.StringLengthDataType;
@@ -41,9 +42,8 @@ public class NativeCapabilities implements ServerCapabilities {
     private int serverDefaultCollationIndex;
     private int statusFlags = 0;
     private int authPluginDataLength = 0;
-    private boolean serverHasFracSecsSupport = true;
 
-    public NativeCapabilities(NativePacketPayload initialHandshakePacket) {
+    public NativeCapabilities(NativePacketPayload initialHandshakePacket) throws UnableToConnectException, WrongArgumentException {
         this.initialHandshakePacket = initialHandshakePacket;
 
         // Get the protocol version
@@ -76,7 +76,7 @@ public class NativeCapabilities implements ServerCapabilities {
             // read capability flags (upper 2 bytes)
             flags |= (int) initialHandshakePacket.readInteger(IntegerDataType.INT2) << 16;
 
-            setCapabilityFlags(flags);
+            this.capabilityFlags = flags;
 
             if ((flags & NativeServerSession.CLIENT_PLUGIN_AUTH) != 0) {
                 // read length of auth-plugin-data (1 byte)
@@ -87,8 +87,6 @@ public class NativeCapabilities implements ServerCapabilities {
             }
             // next 10 bytes are reserved (all [00])
             initialHandshakePacket.setPosition(initialHandshakePacket.getPosition() + 10);
-
-            this.serverHasFracSecsSupport = this.serverVersion.meetsMinimum(new ServerVersion(5, 6, 4));
         } catch (Throwable t) {
             // Chances are that the other end is talking X Protocol instead of MySQL protocol.
             // X Protocol message type byte (NOTICE = 11) coincides with MySQL protocol version byte in the Initial Handshake Packet.
@@ -111,11 +109,6 @@ public class NativeCapabilities implements ServerCapabilities {
     }
 
     @Override
-    public void setCapabilityFlags(int capabilityFlags) {
-        this.capabilityFlags = capabilityFlags;
-    }
-
-    @Override
     public ServerVersion getServerVersion() {
         return this.serverVersion;
     }
@@ -125,22 +118,8 @@ public class NativeCapabilities implements ServerCapabilities {
         return this.threadId;
     }
 
-    @Override
-    public void setThreadId(long threadId) {
-        this.threadId = threadId;
-    }
-
     public String getSeed() {
         return this.seed;
-    }
-
-    /**
-     *
-     * @return Collation index which server provided in handshake greeting packet
-     */
-    @Override
-    public int getServerDefaultCollationIndex() {
-        return this.serverDefaultCollationIndex;
     }
 
     public int getStatusFlags() {
@@ -150,10 +129,4 @@ public class NativeCapabilities implements ServerCapabilities {
     public int getAuthPluginDataLength() {
         return this.authPluginDataLength;
     }
-
-    @Override
-    public boolean serverSupportsFracSecs() {
-        return this.serverHasFracSecsSupport;
-    }
-
 }

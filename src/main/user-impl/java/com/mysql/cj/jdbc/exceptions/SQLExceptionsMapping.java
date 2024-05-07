@@ -20,8 +20,6 @@
 
 package com.mysql.cj.jdbc.exceptions;
 
-import java.sql.SQLException;
-
 import com.mysql.cj.exceptions.CJCommunicationsException;
 import com.mysql.cj.exceptions.CJConnectionFeatureNotAvailableException;
 import com.mysql.cj.exceptions.CJException;
@@ -32,7 +30,6 @@ import com.mysql.cj.exceptions.ConnectionIsClosedException;
 import com.mysql.cj.exceptions.DataConversionException;
 import com.mysql.cj.exceptions.DataReadException;
 import com.mysql.cj.exceptions.DataTruncationException;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
 import com.mysql.cj.exceptions.InvalidConnectionAttributeException;
 import com.mysql.cj.exceptions.MysqlErrorNumbers;
 import com.mysql.cj.exceptions.NumberOutOfRange;
@@ -42,9 +39,11 @@ import com.mysql.cj.exceptions.StatementIsClosedException;
 import com.mysql.cj.exceptions.UnableToConnectException;
 import com.mysql.cj.exceptions.WrongArgumentException;
 
+import java.sql.SQLException;
+
 public class SQLExceptionsMapping {
 
-    public static SQLException translateException(Throwable ex, ExceptionInterceptor interceptor) {
+    public static SQLException translateException(Throwable ex) {
         if (ex instanceof SQLException) {
             return (SQLException) ex;
 
@@ -52,45 +51,45 @@ public class SQLExceptionsMapping {
             return (SQLException) ex.getCause();
 
         } else if (ex instanceof CJCommunicationsException) {
-            return SQLError.createCommunicationsException(ex.getMessage(), ex, interceptor);
+            return SQLError.createCommunicationsException(ex.getMessage(), ex);
 
         } else if (ex instanceof CJConnectionFeatureNotAvailableException) {
             return new ConnectionFeatureNotAvailableException(ex.getMessage(), ex);
 
         } else if (ex instanceof SSLParamsException) {
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_BAD_SSL_PARAMS, 0, false, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_BAD_SSL_PARAMS, 0, false, ex);
 
         } else if (ex instanceof ConnectionIsClosedException) {
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_CONNECTION_NOT_OPEN, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_CONNECTION_NOT_OPEN, ex);
 
         } else if (ex instanceof InvalidConnectionAttributeException) {
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_INVALID_CONNECTION_ATTRIBUTE, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_INVALID_CONNECTION_ATTRIBUTE, ex);
 
         } else if (ex instanceof UnableToConnectException) {
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_UNABLE_TO_CONNECT_TO_DATASOURCE, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_UNABLE_TO_CONNECT_TO_DATASOURCE, ex);
 
         } else if (ex instanceof StatementIsClosedException) {
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, ex);
 
         } else if (ex instanceof WrongArgumentException) {
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, ex);
 
         } else if (ex instanceof StringIndexOutOfBoundsException) {
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, ex);
 
         } else if (ex instanceof NumberOutOfRange) {
             // must come before DataReadException as it's more specific
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_NUMERIC_VALUE_OUT_OF_RANGE, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_NUMERIC_VALUE_OUT_OF_RANGE, ex);
 
         } else if (ex instanceof DataConversionException) {
             // must come before DataReadException as it's more specific
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_INVALID_CHARACTER_VALUE_FOR_CAST, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_INVALID_CHARACTER_VALUE_FOR_CAST, ex);
 
         } else if (ex instanceof DataReadException) {
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, ex);
 
         } else if (ex instanceof DataTruncationException) {
-            return new MysqlDataTruncation(((DataTruncationException) ex).getMessage(), ((DataTruncationException) ex).getIndex(),
+            return new MysqlDataTruncation(ex.getMessage(), ((DataTruncationException) ex).getIndex(),
                     ((DataTruncationException) ex).isParameter(), ((DataTruncationException) ex).isRead(), ((DataTruncationException) ex).getDataSize(),
                     ((DataTruncationException) ex).getTransferSize(), ((DataTruncationException) ex).getVendorCode());
 
@@ -111,15 +110,10 @@ public class SQLExceptionsMapping {
 
         } else if (ex instanceof CJException) {
             return SQLError.createSQLException(ex.getMessage(), ((CJException) ex).getSQLState(), ((CJException) ex).getVendorCode(),
-                    ((CJException) ex).isTransient(), ex.getCause(), interceptor);
+                    ((CJException) ex).isTransient(), ex.getCause());
 
         } else {
-            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_GENERAL_ERROR, ex, interceptor);
+            return SQLError.createSQLException(ex.getMessage(), MysqlErrorNumbers.SQL_STATE_GENERAL_ERROR, ex);
         }
     }
-
-    public static SQLException translateException(Throwable ex) {
-        return translateException(ex, null);
-    }
-
 }

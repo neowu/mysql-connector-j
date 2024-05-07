@@ -26,10 +26,6 @@ public interface CancelQueryTask {
 
     Throwable getCaughtWhileCancelling();
 
-    void setCaughtWhileCancelling(Throwable caughtWhileCancelling);
-
-    Query getQueryToCancel();
-
     void setQueryToCancel(Query queryToCancel);
 
 }

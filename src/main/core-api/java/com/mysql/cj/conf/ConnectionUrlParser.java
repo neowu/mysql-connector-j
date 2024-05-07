@@ -107,7 +107,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *            The connection string to parse.
      * @return an instance of {@link ConnectionUrlParser}
      */
-    public static ConnectionUrlParser parseConnectionString(String connString) {
+    public static ConnectionUrlParser parseConnectionString(String connString) throws UnsupportedConnectionStringException, WrongArgumentException {
         return new ConnectionUrlParser(connString);
     }
 
@@ -117,7 +117,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      * @param connString
      *            the connection string to parse
      */
-    private ConnectionUrlParser(String connString) {
+    private ConnectionUrlParser(String connString) throws WrongArgumentException, UnsupportedConnectionStringException {
         if (connString == null) {
             throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("ConnectionString.0"));
         }
@@ -137,7 +137,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *            connection string
      * @return true if supported
      */
-    public static boolean isConnectionStringSupported(String connString) {
+    public static boolean isConnectionStringSupported(String connString) throws WrongArgumentException {
         if (connString == null) {
             throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("ConnectionString.0"));
         }
@@ -148,7 +148,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
     /**
      * Splits the connection string in its main sections.
      */
-    private void parseConnectionString() {
+    private void parseConnectionString() throws WrongArgumentException {
         String connString = this.baseConnectionString;
         Matcher matcher = CONNECTION_STRING_PTRN.matcher(connString);
         if (!matcher.matches()) {
@@ -163,7 +163,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
     /**
      * Parses the authority section (user and/or host identification) of the connection string URI.
      */
-    private void parseAuthoritySection() {
+    private void parseAuthoritySection() throws WrongArgumentException {
         if (isNullOrEmpty(this.authority)) {
             // Add an empty, default, host.
             this.parsedHosts.add(new HostInfo());
@@ -195,7 +195,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      * @param authSegment
      *            the string containing the authority segment
      */
-    private void parseAuthoritySegment(String authSegment) {
+    private void parseAuthoritySegment(String authSegment) throws WrongArgumentException {
         /*
          * Start by splitting the user and host information parts from the authority segment and process the user information, if any.
          */
@@ -339,7 +339,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *            the string containing the host information part
      * @return a list with all {@link HostInfo} instances containing the parsed information or <code>null</code> if unable to parse the host information
      */
-    private List<HostInfo> buildHostInfoResortingToSubHostsListParser(String user, String password, String hostInfo) {
+    private List<HostInfo> buildHostInfoResortingToSubHostsListParser(String user, String password, String hostInfo) throws WrongArgumentException {
         Matcher matcher = HOST_LIST_PTRN.matcher(hostInfo);
         if (matcher.matches()) {
             String hosts = matcher.group("hosts");
@@ -381,7 +381,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *            the string containing the host information part
      * @return the {@link HostInfo} instance containing the parsed information or <code>null</code> if unable to parse the host information
      */
-    private HostInfo buildHostInfoResortingToKeyValueSyntaxParser(String user, String password, String hostInfo) {
+    private HostInfo buildHostInfoResortingToKeyValueSyntaxParser(String user, String password, String hostInfo) throws WrongArgumentException {
         if (!hostInfo.startsWith(KEY_VALUE_HOST_INFO_OPENING_MARKER) || !hostInfo.endsWith(KEY_VALUE_HOST_INFO_CLOSING_MARKER)) {
             // This pattern won't work.
             return null;
@@ -401,7 +401,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *            the string containing the host information part
      * @return the {@link HostInfo} instance containing the parsed information or <code>null</code> if unable to parse the host information
      */
-    private HostInfo buildHostInfoResortingToAddressEqualsSyntaxParser(String user, String password, String hostInfo) {
+    private HostInfo buildHostInfoResortingToAddressEqualsSyntaxParser(String user, String password, String hostInfo) throws WrongArgumentException {
         int p = StringUtils.indexOfIgnoreCase(hostInfo, ADDRESS_EQUALS_HOST_INFO_PREFIX);
         if (p != 0) {
             // This pattern won't work.
@@ -422,7 +422,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *            the string containing the host information part
      * @return the {@link HostInfo} instance containing the parsed information or <code>null</code> if unable to parse the host information
      */
-    private HostInfo buildHostInfoResortingToGenericSyntaxParser(String user, String password, String hostInfo) {
+    private HostInfo buildHostInfoResortingToGenericSyntaxParser(String user, String password, String hostInfo) throws WrongArgumentException {
         if (splitByUserInfoAndHostInfo(hostInfo).left != null) {
             // This host information is invalid if contains another user information part.
             return null;
@@ -476,7 +476,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *            the host:pair to parse
      * @return a {@link Pair} containing the host and port information or null if the host information can't be parsed
      */
-    public static Pair<String, Integer> parseHostPortPair(String hostInfo) {
+    public static Pair<String, Integer> parseHostPortPair(String hostInfo) throws WrongArgumentException {
         if (isNullOrEmpty(hostInfo)) {
             return null;
         }
@@ -501,7 +501,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
     /**
      * Parses the connection properties section and stores the extracted key/value pairs into a local map.
      */
-    private void parseQuerySection() {
+    private void parseQuerySection() throws WrongArgumentException {
         if (isNullOrEmpty(this.query)) {
             this.parsedProperties = new HashMap<>();
             return;
@@ -520,7 +520,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *            the input string
      * @return a key/value map containing the matched values
      */
-    private Map<String, String> processKeyValuePattern(Pattern pattern, String input) {
+    private Map<String, String> processKeyValuePattern(Pattern pattern, String input) throws WrongArgumentException {
         Matcher matcher = pattern.matcher(input);
         int p = 0;
         Map<String, String> kvMap = new HashMap<>();
@@ -637,7 +637,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *
      * @return the hosts information
      */
-    public List<HostInfo> getHosts() {
+    public List<HostInfo> getHosts() throws WrongArgumentException {
         if (this.parsedHosts == null) {
             this.parsedHosts = new ArrayList<>();
             parseAuthoritySection();
@@ -650,7 +650,7 @@ public class ConnectionUrlParser implements DatabaseUrlContainer {
      *
      * @return the properties map
      */
-    public Map<String, String> getProperties() {
+    public Map<String, String> getProperties() throws WrongArgumentException {
         if (this.parsedProperties == null) {
             parseQuerySection();
         }

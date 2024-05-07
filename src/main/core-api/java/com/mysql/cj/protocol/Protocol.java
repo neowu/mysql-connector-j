@@ -20,18 +20,14 @@
 
 package com.mysql.cj.protocol;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.function.Supplier;
-
 import com.mysql.cj.MessageBuilder;
-import com.mysql.cj.QueryResult;
 import com.mysql.cj.Session;
-import com.mysql.cj.TransactionEventHandler;
 import com.mysql.cj.conf.PropertySet;
+import com.mysql.cj.exceptions.CJCommunicationsException;
 import com.mysql.cj.exceptions.CJException;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.protocol.Protocol.ProtocolEventListener.EventType;
+
+import java.io.IOException;
+import java.util.function.Supplier;
 
 /**
  * A protocol provides the facilities to communicate with a MySQL server.
@@ -52,10 +48,8 @@ public interface Protocol<M extends Message> {
      *            {@link SocketConnection}
      * @param propertySet
      *            {@link PropertySet}
-     * @param transactionManager
-     *            {@link TransactionEventHandler}
      */
-    void init(Session session, SocketConnection socketConnection, PropertySet propertySet, TransactionEventHandler transactionManager);
+    void init(Session session, SocketConnection socketConnection, PropertySet propertySet) throws CJCommunicationsException;
 
     PropertySet getPropertySet();
 
@@ -68,23 +62,11 @@ public interface Protocol<M extends Message> {
      *
      * @return {@link ServerCapabilities}
      */
-    ServerCapabilities readServerCapabilities();
+    ServerCapabilities readServerCapabilities() throws CJException;
 
     ServerSession getServerSession();
 
     SocketConnection getSocketConnection();
-
-    AuthenticationProvider<M> getAuthenticationProvider();
-
-    ExceptionInterceptor getExceptionInterceptor();
-
-    PacketSentTimeHolder getPacketSentTimeHolder();
-
-    void setPacketSentTimeHolder(PacketSentTimeHolder packetSentTimeHolder);
-
-    PacketReceivedTimeHolder getPacketReceivedTimeHolder();
-
-    void setPacketReceivedTimeHolder(PacketReceivedTimeHolder packetReceivedTimeHolder);
 
     /**
      * Create a new session. This generally happens once at the beginning of a connection.
@@ -96,30 +78,15 @@ public interface Protocol<M extends Message> {
      * @param database
      *            database name
      */
-    void connect(String user, String password, String database);
+    void connect(String user, String password, String database) throws CJException;
 
-    void negotiateSSLConnection();
+    void negotiateSSLConnection() throws CJException;
 
-    void beforeHandshake();
+    void beforeHandshake() throws CJException;
 
-    void afterHandshake();
+    void afterHandshake() throws CJCommunicationsException;
 
-    void changeDatabase(String database);
-
-    /**
-     * Re-authenticates as the given user and password
-     *
-     * @param user
-     *            DB user name
-     * @param password
-     *            DB user password
-     * @param database
-     *            database name
-     *
-     */
-    void changeUser(String user, String password, String database);
-
-    boolean versionMeetsMinimum(int major, int minor, int subminor);
+    void changeDatabase(String database) throws CJCommunicationsException;
 
     /**
      * Read one message from the MySQL server into the reusable buffer if provided or into the new one.
@@ -128,7 +95,7 @@ public interface Protocol<M extends Message> {
      *            {@link Message} instance to read into, may be null
      * @return the message from the server.
      */
-    M readMessage(M reuse);
+    M readMessage(M reuse) throws CJException;
 
     /**
      * Read one message from the MySQL server, checks for errors in it, and if none,
@@ -136,7 +103,7 @@ public interface Protocol<M extends Message> {
      *
      * @return a message ready for reading.
      */
-    M checkErrorMessage();
+    M checkErrorMessage() throws CJException;
 
     /**
      * @param message
@@ -144,9 +111,7 @@ public interface Protocol<M extends Message> {
      * @param packetLen
      *            length of header + payload
      */
-    void send(Message message, int packetLen);
-
-    ColumnDefinition readMetadata();
+    void send(Message message, int packetLen) throws CJException;
 
     /**
      * Send a command to the MySQL server.
@@ -166,24 +131,17 @@ public interface Protocol<M extends Message> {
      *             if an I/O error or SQL error occurs
      */
 
-    M sendCommand(Message queryPacket, boolean skipCheck, int timeoutMillis);
+    M sendCommand(Message queryPacket, boolean skipCheck, int timeoutMillis) throws CJException;
 
-    <T extends ProtocolEntity> T read(Class<T> requiredClass, ProtocolEntityFactory<T, M> protocolEntityFactory) throws IOException;
+    <T extends ProtocolEntity> T read(Class<T> requiredClass, ProtocolEntityFactory<T, M> protocolEntityFactory) throws IOException, CJException;
 
     /**
      * Read protocol entity.
      *
      * @param requiredClass
      *            required Resultset class
-     * @param maxRows
-     *            the maximum number of rows to read (-1 means all rows)
-     * @param streamResults
-     *            should the driver leave the results on the wire,
-     *            and read them only when needed?
      * @param resultPacket
      *            the first packet of information in the result set
-     * @param isBinaryEncoded
-     *            true if the binary protocol is used (for server prepared statements)
      * @param metadata
      *            use this metadata instead of the one provided on wire
      * @param protocolEntityFactory
@@ -195,96 +153,16 @@ public interface Protocol<M extends Message> {
      * @throws IOException
      *             if an error occurs
      */
-    <T extends ProtocolEntity> T read(Class<Resultset> requiredClass, int maxRows, boolean streamResults, M resultPacket, boolean isBinaryEncoded,
-            ColumnDefinition metadata, ProtocolEntityFactory<T, M> protocolEntityFactory) throws IOException;
-
-    /**
-     * Sets an InputStream instance that will be used to send data
-     * to the MySQL server for a "LOAD DATA LOCAL INFILE" statement
-     * rather than a FileInputStream or URLInputStream that represents
-     * the path given as an argument to the statement.
-     *
-     * This stream will be read to completion upon execution of a
-     * "LOAD DATA LOCAL INFILE" statement, and will automatically
-     * be closed by the driver, so it needs to be reset
-     * before each call to execute*() that would cause the MySQL
-     * server to request data to fulfill the request for
-     * "LOAD DATA LOCAL INFILE".
-     *
-     * If this value is set to NULL, the driver will revert to using
-     * a FileInputStream or URLInputStream as required.
-     *
-     * @param stream
-     *            input stream
-     */
-    void setLocalInfileInputStream(InputStream stream);
-
-    /**
-     * Returns the InputStream instance that will be used to send
-     * data in response to a "LOAD DATA LOCAL INFILE" statement.
-     *
-     * This method returns NULL if no such stream has been set
-     * via setLocalInfileInputStream().
-     *
-     * @return input stream
-     */
-    InputStream getLocalInfileInputStream();
-
-    /**
-     * Read messages from server and deliver them to resultBuilder.
-     *
-     * @param resultBuilder
-     *            {@link ResultBuilder} instance
-     * @param <T>
-     *            result type
-     * @return {@link QueryResult}
-     */
-    <T extends QueryResult> T readQueryResult(ResultBuilder<T> resultBuilder);
-
-    void close() throws IOException;
+    <T extends ProtocolEntity> T read(Class<Resultset> requiredClass, M resultPacket, ColumnDefinition metadata, ProtocolEntityFactory<T, M> protocolEntityFactory) throws IOException, CJException;
 
     void configureTimeZone();
 
-    void initServerSession();
+    void initServerSession() throws CJException;
 
     /**
      * Return Protocol to its initial state right after successful connect.
      */
     void reset();
-
-    String getQueryTimingUnits();
-
-    public static interface ProtocolEventListener {
-
-        public enum EventType {
-            SERVER_SHUTDOWN, SERVER_CLOSED_SESSION;
-        }
-
-        void handleEvent(EventType type, Object info, Throwable reason);
-
-    }
-
-    public static interface ProtocolEventHandler {
-
-        /**
-         * Add listener for this protocol events.
-         *
-         * @param l
-         *            {@link ProtocolEventListener} instance.
-         */
-        void addListener(ProtocolEventListener l);
-
-        /**
-         * Remove protocol listener.
-         *
-         * @param l
-         *            {@link ProtocolEventListener} instance.
-         */
-        void removeListener(ProtocolEventListener l);
-
-        void invokeListeners(EventType type, Throwable reason);
-
-    }
 
     Supplier<ValueEncoder> getValueEncoderSupplier(Object obj);
 

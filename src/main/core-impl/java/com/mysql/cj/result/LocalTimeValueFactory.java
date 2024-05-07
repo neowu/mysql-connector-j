@@ -52,7 +52,7 @@ public class LocalTimeValueFactory extends AbstractDateTimeValueFactory<LocalTim
     }
 
     @Override
-    public LocalTime localCreateFromTime(InternalTime it) {
+    public LocalTime localCreateFromTime(InternalTime it) throws DataReadException {
         if (it.getHours() < 0 || it.getHours() >= 24) {
             throw new DataReadException(Messages.getString("ResultSet.InvalidTimeValue", new Object[] { it.toString() }));
         }
@@ -60,7 +60,7 @@ public class LocalTimeValueFactory extends AbstractDateTimeValueFactory<LocalTim
     }
 
     @Override
-    public LocalTime localCreateFromTimestamp(InternalTimestamp its) {
+    public LocalTime localCreateFromTimestamp(InternalTimestamp its) throws DataReadException {
         if (this.warningListener != null) {
             this.warningListener.warningEncountered(Messages.getString("ResultSet.PrecisionLostWarning", new Object[] { getTargetTypeName() }));
         }
@@ -69,7 +69,7 @@ public class LocalTimeValueFactory extends AbstractDateTimeValueFactory<LocalTim
     }
 
     @Override
-    public LocalTime localCreateFromDatetime(InternalTimestamp its) {
+    public LocalTime localCreateFromDatetime(InternalTimestamp its) throws DataReadException {
         if (this.warningListener != null) {
             this.warningListener.warningEncountered(Messages.getString("ResultSet.PrecisionLostWarning", new Object[] { getTargetTypeName() }));
         }

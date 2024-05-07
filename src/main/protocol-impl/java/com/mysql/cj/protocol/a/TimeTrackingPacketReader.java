@@ -23,6 +23,8 @@ package com.mysql.cj.protocol.a;
 import java.io.IOException;
 import java.util.Optional;
 
+import com.mysql.cj.exceptions.CJPacketTooBigException;
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.MessageReader;
 import com.mysql.cj.protocol.PacketReceivedTimeHolder;
 
@@ -39,24 +41,24 @@ public class TimeTrackingPacketReader implements MessageReader<NativePacketHeade
     }
 
     @Override
-    public NativePacketHeader readHeader() throws IOException {
+    public NativePacketHeader readHeader() throws IOException, CJPacketTooBigException {
         return this.packetReader.readHeader();
     }
 
     @Override
-    public NativePacketHeader probeHeader() throws IOException {
+    public NativePacketHeader probeHeader() throws IOException, CJPacketTooBigException {
         return this.packetReader.probeHeader();
     }
 
     @Override
-    public NativePacketPayload readMessage(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException {
+    public NativePacketPayload readMessage(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException, CJPacketTooBigException, WrongArgumentException {
         NativePacketPayload buf = this.packetReader.readMessage(reuse, header);
         this.lastPacketReceivedTimeMs = System.currentTimeMillis();
         return buf;
     }
 
     @Override
-    public NativePacketPayload probeMessage(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException {
+    public NativePacketPayload probeMessage(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException, CJPacketTooBigException, WrongArgumentException {
         NativePacketPayload buf = this.packetReader.probeMessage(reuse, header);
         this.lastPacketReceivedTimeMs = System.currentTimeMillis();
         return buf;
@@ -80,11 +82,6 @@ public class TimeTrackingPacketReader implements MessageReader<NativePacketHeade
     @Override
     public MessageReader<NativePacketHeader, NativePacketPayload> undecorateAll() {
         return this.packetReader.undecorateAll();
-    }
-
-    @Override
-    public MessageReader<NativePacketHeader, NativePacketPayload> undecorate() {
-        return this.packetReader;
     }
 
 }

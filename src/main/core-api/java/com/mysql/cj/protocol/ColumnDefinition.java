@@ -20,9 +20,9 @@
 
 package com.mysql.cj.protocol;
 
-import java.util.Map;
-
 import com.mysql.cj.result.Field;
+
+import java.util.Map;
 
 /**
  * Represents protocol specific result set metadata,
@@ -45,27 +45,9 @@ public interface ColumnDefinition extends ProtocolEntity {
 
     boolean hasBuiltIndexMapping();
 
-    public Map<String, Integer> getColumnLabelToIndex();
+    void setColumnToIndexCache(Map<String, Integer> columnToIndexCache);
 
-    void setColumnLabelToIndex(Map<String, Integer> columnLabelToIndex);
-
-    public Map<String, Integer> getFullColumnNameToIndex();
-
-    void setFullColumnNameToIndex(Map<String, Integer> fullColNameToIndex);
-
-    public Map<String, Integer> getColumnNameToIndex();
-
-    void setColumnNameToIndex(Map<String, Integer> colNameToIndex);
-
-    public Map<String, Integer> getColumnToIndexCache();
-
-    public void setColumnToIndexCache(Map<String, Integer> columnToIndexCache);
-
-    void initializeFrom(ColumnDefinition columnDefinition);
-
-    void exportTo(ColumnDefinition columnDefinition);
-
-    int findColumn(String columnName, boolean useColumnNamesInFindColumn, int indexBase);
+    int findColumn(String columnName, int indexBase);
 
     /**
      * Check if fields with type BLOB, MEDIUMBLOB, LONGBLOB, TEXT, MEDIUMTEXT or LONGTEXT exist in this ColumnDefinition.

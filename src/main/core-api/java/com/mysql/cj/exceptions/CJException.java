@@ -23,7 +23,7 @@ package com.mysql.cj.exceptions;
 /**
  * The base unchecked exception thrown internally in connector.
  */
-public class CJException extends RuntimeException {
+public class CJException extends Exception {
 
     private static final long serialVersionUID = -8618536991444733607L;
 

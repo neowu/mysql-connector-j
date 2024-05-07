@@ -23,8 +23,6 @@ package com.mysql.cj.protocol.a;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.protocol.ColumnDefinition;
 import com.mysql.cj.protocol.ProtocolEntityFactory;
-import com.mysql.cj.protocol.Resultset;
-import com.mysql.cj.protocol.Resultset.Concurrency;
 import com.mysql.cj.protocol.ResultsetRow;
 import com.mysql.cj.protocol.a.NativeConstants.StringSelfDataType;
 import com.mysql.cj.protocol.a.result.ByteArrayRow;
@@ -32,13 +30,9 @@ import com.mysql.cj.protocol.a.result.TextBufferRow;
 
 public class TextRowFactory extends AbstractRowFactory implements ProtocolEntityFactory<ResultsetRow, NativePacketPayload> {
 
-    public TextRowFactory(NativeProtocol protocol, ColumnDefinition colDefinition, Resultset.Concurrency resultSetConcurrency,
-            boolean canReuseRowPacketForBufferRow) {
+    public TextRowFactory(NativeProtocol protocol, ColumnDefinition colDefinition) {
         this.columnDefinition = colDefinition;
-        this.resultSetConcurrency = resultSetConcurrency;
-        this.canReuseRowPacketForBufferRow = canReuseRowPacketForBufferRow;
         this.useBufferRowSizeThreshold = protocol.getPropertySet().getMemorySizeProperty(PropertyKey.largeRowSizeThreshold);
-        this.exceptionInterceptor = protocol.getExceptionInterceptor();
         this.valueDecoder = new MysqlTextValueDecoder();
     }
 
@@ -46,25 +40,18 @@ public class TextRowFactory extends AbstractRowFactory implements ProtocolEntity
     public ResultsetRow createFromMessage(NativePacketPayload rowPacket) {
         // use a buffer row for reusable packets (streaming results), blobs and long strings
         // or if we're over the threshold
-        boolean useBufferRow = this.canReuseRowPacketForBufferRow || this.columnDefinition.hasLargeFields()
-                || rowPacket.getPayloadLength() >= this.useBufferRowSizeThreshold.getValue();
+        boolean useBufferRow = this.columnDefinition.hasLargeFields() || rowPacket.getPayloadLength() >= this.useBufferRowSizeThreshold.getValue();
 
-        if (this.resultSetConcurrency == Concurrency.UPDATABLE || !useBufferRow) {
+        if (!useBufferRow) {
             byte[][] rowBytes = new byte[this.columnDefinition.getFields().length][];
 
             for (int i = 0; i < this.columnDefinition.getFields().length; i++) {
                 rowBytes[i] = rowPacket.readBytes(StringSelfDataType.STRING_LENENC);
             }
 
-            return new ByteArrayRow(rowBytes, this.exceptionInterceptor);
+            return new ByteArrayRow(rowBytes);
         }
 
-        return new TextBufferRow(rowPacket, this.columnDefinition, this.exceptionInterceptor, this.valueDecoder);
+        return new TextBufferRow(rowPacket, this.columnDefinition, this.valueDecoder);
     }
-
-    @Override
-    public boolean canReuseRowPacketForBufferRow() {
-        return this.canReuseRowPacketForBufferRow;
-    }
-
 }

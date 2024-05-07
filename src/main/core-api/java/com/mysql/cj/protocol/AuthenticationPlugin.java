@@ -20,9 +20,9 @@
 
 package com.mysql.cj.protocol;
 
-import java.util.List;
+import com.mysql.cj.exceptions.CJException;
 
-import com.mysql.cj.callback.MysqlCallbackHandler;
+import java.util.List;
 
 /**
  * Implementors of this interface can be installed via the "authenticationPlugins" configuration property.
@@ -41,22 +41,7 @@ public interface AuthenticationPlugin<M extends Message> {
      * @param protocol
      *            protocol instance
      */
-    default void init(Protocol<M> protocol) {
-    }
-
-    /**
-     * Initializes this plugin with a direct Protocol reference and a generic {@link MysqlCallbackHandler} that can be used to pass over information back to the
-     * authentication provider.
-     * For example an authentication plugin may accept <code>null</code> usernames and use that information to obtain them from some external source, such as
-     * the system login.
-     *
-     * @param protocol
-     *            the protocol instance
-     * @param callbackHandler
-     *            a callback handler to provide additional information to the authentication provider
-     */
-    default void init(Protocol<M> protocol, MysqlCallbackHandler callbackHandler) {
-        init(protocol);
+    default void init(Protocol<M> protocol) throws CJException {
     }
 
     /**
@@ -142,6 +127,6 @@ public interface AuthenticationPlugin<M extends Message> {
      *
      * @return return value is ignored.
      */
-    boolean nextAuthenticationStep(M fromServer, List<M> toServer);
+    boolean nextAuthenticationStep(M fromServer, List<M> toServer) throws CJException;
 
 }

@@ -20,32 +20,18 @@
 
 package com.mysql.cj.result;
 
+import java.sql.SQLException;
 import java.util.Iterator;
 
 import com.mysql.cj.Messages;
 import com.mysql.cj.exceptions.CJOperationNotSupportedException;
 import com.mysql.cj.exceptions.ExceptionFactory;
+import com.mysql.cj.jdbc.exceptions.SQLExceptionsMapping;
 
 /**
  * A list of {@link Row}s.
  */
 public interface RowList extends Iterator<Row> {
-
-    /**
-     * What's returned for the size of a row list when its size can not be
-     * determined.
-     */
-    public static final int RESULT_SET_SIZE_UNKNOWN = -1;
-
-    /**
-     * Optionally iterate backwards on the list.
-     *
-     * @return {@link Row}
-     */
-    default Row previous() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
-    }
-
     /**
      * Optionally retrieve Row at index <i>n</i>.
      *
@@ -55,26 +41,20 @@ public interface RowList extends Iterator<Row> {
      *            row number
      * @return {@link Row}
      */
-    default Row get(int n) {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
-    }
+    Row get(int n) throws SQLException;
 
     /**
      * Returns the current position.
      *
      * @return the current row number
      */
-    default int getPosition() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
-    }
+    int getPosition() throws SQLException;
 
     /**
      * Only works on non dynamic row lists.
      *
      * @return the size of this row list
      */
-    default int size() {
-        return RESULT_SET_SIZE_UNKNOWN;
-    }
+    int size();
 
 }

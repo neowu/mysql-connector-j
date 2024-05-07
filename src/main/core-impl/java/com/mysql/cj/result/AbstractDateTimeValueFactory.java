@@ -21,10 +21,12 @@
 package com.mysql.cj.result;
 
 import com.mysql.cj.Messages;
-import com.mysql.cj.conf.PropertyDefinitions;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.exceptions.DataConversionException;
+import com.mysql.cj.exceptions.DataReadException;
+import com.mysql.cj.exceptions.NumberOutOfRange;
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.InternalDate;
 import com.mysql.cj.protocol.InternalTime;
 import com.mysql.cj.protocol.InternalTimestamp;
@@ -37,66 +39,36 @@ public abstract class AbstractDateTimeValueFactory<T> extends DefaultValueFactor
         super(pset);
     }
 
-    abstract T localCreateFromDate(InternalDate idate);
+    abstract T localCreateFromDate(InternalDate idate) throws DataReadException;
 
-    abstract T localCreateFromTime(InternalTime it);
+    abstract T localCreateFromTime(InternalTime it) throws DataReadException;
 
-    abstract T localCreateFromTimestamp(InternalTimestamp its);
+    abstract T localCreateFromTimestamp(InternalTimestamp its) throws DataReadException;
 
-    abstract T localCreateFromDatetime(InternalTimestamp its);
+    abstract T localCreateFromDatetime(InternalTimestamp its) throws DataReadException;
 
     @Override
-    public T createFromDate(InternalDate idate) {
-        if (idate.isZero()) {
-            switch (this.pset.<PropertyDefinitions.ZeroDatetimeBehavior>getEnumProperty(PropertyKey.zeroDateTimeBehavior).getValue()) {
-                case CONVERT_TO_NULL:
-                    return null;
-                case ROUND:
-                    return localCreateFromDate(new InternalDate(1, 1, 1));
-                default:
-                    break;
-            }
-        }
+    public T createFromDate(InternalDate idate) throws DataReadException {
         return localCreateFromDate(idate);
     }
 
     @Override
-    public T createFromTime(InternalTime it) {
+    public T createFromTime(InternalTime it) throws DataReadException {
         return localCreateFromTime(it);
     }
 
     @Override
-    public T createFromTimestamp(InternalTimestamp its) {
-        if (its.isZero()) {
-            switch (this.pset.<PropertyDefinitions.ZeroDatetimeBehavior>getEnumProperty(PropertyKey.zeroDateTimeBehavior).getValue()) {
-                case CONVERT_TO_NULL:
-                    return null;
-                case ROUND:
-                    return localCreateFromTimestamp(new InternalTimestamp(1, 1, 1, 0, 0, 0, 0, 0));
-                default:
-                    break;
-            }
-        }
+    public T createFromTimestamp(InternalTimestamp its) throws DataReadException {
         return localCreateFromTimestamp(its);
     }
 
     @Override
-    public T createFromDatetime(InternalTimestamp its) {
-        if (its.isZero()) {
-            switch (this.pset.<PropertyDefinitions.ZeroDatetimeBehavior>getEnumProperty(PropertyKey.zeroDateTimeBehavior).getValue()) {
-                case CONVERT_TO_NULL:
-                    return null;
-                case ROUND:
-                    return localCreateFromDatetime(new InternalTimestamp(1, 1, 1, 0, 0, 0, 0, 0));
-                default:
-                    break;
-            }
-        }
+    public T createFromDatetime(InternalTimestamp its) throws DataReadException {
         return localCreateFromDatetime(its);
     }
 
     @Override
-    public T createFromYear(long year) {
+    public T createFromYear(long year) throws DataReadException {
         if (this.pset.getBooleanProperty(PropertyKey.yearIsDateType).getValue()) {
             if (year < 100) {
                 if (year <= 69) {
@@ -110,7 +82,7 @@ public abstract class AbstractDateTimeValueFactory<T> extends DefaultValueFactor
     }
 
     @Override
-    public T createFromBytes(byte[] bytes, int offset, int length, Field f) {
+    public T createFromBytes(byte[] bytes, int offset, int length, Field f) throws DataReadException {
         if (length == 0 && this.pset.getBooleanProperty(PropertyKey.emptyStringsConvertToZero).getValue()) {
             return createFromLong(0);
         }

@@ -20,11 +20,6 @@
 
 package com.mysql.cj.result;
 
-import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
-import java.util.TimeZone;
-
 import com.mysql.cj.Messages;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
@@ -35,6 +30,11 @@ import com.mysql.cj.protocol.InternalTime;
 import com.mysql.cj.protocol.InternalTimestamp;
 import com.mysql.cj.protocol.a.MysqlTextValueDecoder;
 import com.mysql.cj.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.TimeZone;
 
 /**
  * Value factory to create {@link ZonedDateTime} instances.
@@ -56,7 +56,7 @@ public class ZonedDateTimeValueFactory extends AbstractDateTimeValueFactory<Zone
      * @return an ZonedDateTime at midnight on the day given by the DATE value
      */
     @Override
-    public ZonedDateTime localCreateFromDate(InternalDate idate) {
+    public ZonedDateTime localCreateFromDate(InternalDate idate) throws DataReadException {
         if (idate.getYear() == 0 && idate.getMonth() == 0 && idate.getDay() == 0) {
             throw new DataReadException(Messages.getString("ResultSet.InvalidZeroDate"));
         }
@@ -69,7 +69,7 @@ public class ZonedDateTimeValueFactory extends AbstractDateTimeValueFactory<Zone
      * @return an ZonedDateTime at the given time on 1970 Jan 1.
      */
     @Override
-    public ZonedDateTime localCreateFromTime(InternalTime it) {
+    public ZonedDateTime localCreateFromTime(InternalTime it) throws DataReadException {
         if (it.getHours() < 0 || it.getHours() >= 24) {
             throw new DataReadException(Messages.getString("ResultSet.InvalidTimeValue", new Object[] { it.toString() }));
         }
@@ -77,25 +77,25 @@ public class ZonedDateTimeValueFactory extends AbstractDateTimeValueFactory<Zone
     }
 
     @Override
-    public ZonedDateTime localCreateFromTimestamp(InternalTimestamp its) {
+    public ZonedDateTime localCreateFromTimestamp(InternalTimestamp its) throws DataReadException {
         if (its.getYear() == 0 && its.getMonth() == 0 && its.getDay() == 0) {
             throw new DataReadException(Messages.getString("ResultSet.InvalidZeroDate"));
         }
         return LocalDateTime.of(its.getYear(), its.getMonth(), its.getDay(), its.getHours(), its.getMinutes(), its.getSeconds(), its.getNanos())
-                .atZone((this.pset.getBooleanProperty(PropertyKey.preserveInstants).getValue() ? this.connectionTimeZone : this.defaultTimeZone).toZoneId());
+                .atZone((this.connectionTimeZone).toZoneId());
     }
 
     @Override
-    public ZonedDateTime localCreateFromDatetime(InternalTimestamp its) {
+    public ZonedDateTime localCreateFromDatetime(InternalTimestamp its) throws DataReadException {
         if (its.getYear() == 0 && its.getMonth() == 0 && its.getDay() == 0) {
             throw new DataReadException(Messages.getString("ResultSet.InvalidZeroDate"));
         }
         return LocalDateTime.of(its.getYear(), its.getMonth(), its.getDay(), its.getHours(), its.getMinutes(), its.getSeconds(), its.getNanos())
-                .atZone((this.pset.getBooleanProperty(PropertyKey.preserveInstants).getValue() ? this.connectionTimeZone : this.defaultTimeZone).toZoneId());
+                .atZone((this.connectionTimeZone).toZoneId());
     }
 
     @Override
-    public ZonedDateTime createFromBytes(byte[] bytes, int offset, int length, Field f) {
+    public ZonedDateTime createFromBytes(byte[] bytes, int offset, int length, Field f) throws DataReadException {
         if (length == 0 && this.pset.getBooleanProperty(PropertyKey.emptyStringsConvertToZero).getValue()) {
             return createFromLong(0);
         }

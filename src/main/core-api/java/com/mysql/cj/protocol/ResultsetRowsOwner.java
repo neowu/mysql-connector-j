@@ -21,34 +21,11 @@
 package com.mysql.cj.protocol;
 
 import com.mysql.cj.MysqlConnection;
-import com.mysql.cj.Query;
 import com.mysql.cj.Session;
 
 public interface ResultsetRowsOwner {
 
-    void closeOwner(boolean calledExplicitly);
-
     MysqlConnection getConnection();
 
     Session getSession();
-
-    Object getSyncMutex();
-
-    /**
-     * StackTrace generated where ResultSet was created... used when profiling
-     *
-     * @return string representation of a stack trace
-     */
-    String getPointOfOrigin();
-
-    int getOwnerFetchSize();
-
-    Query getOwningQuery();
-
-    int getOwningStatementMaxRows();
-
-    int getOwningStatementFetchSize();
-
-    long getOwningStatementServerId();
-
 }

@@ -20,11 +20,6 @@
 
 package com.mysql.cj;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.RuntimeProperty;
 import com.mysql.cj.exceptions.CJException;
@@ -34,17 +29,16 @@ import com.mysql.cj.exceptions.OperationCancelledException;
 import com.mysql.cj.protocol.Message;
 import com.mysql.cj.protocol.ProtocolEntityFactory;
 import com.mysql.cj.protocol.Resultset;
-import com.mysql.cj.protocol.Resultset.Type;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 
 public abstract class AbstractQuery implements Query {
 
-    /** Used to generate IDs when profiling. */
-    static int statementCounter = 1;
-
     public NativeSession session = null;
-
-    /** Used to identify this statement when profiling. */
-    protected int statementId;
 
     protected RuntimeProperty<Integer> maxAllowedPacket;
 
@@ -52,7 +46,7 @@ public abstract class AbstractQuery implements Query {
     protected String charEncoding = null;
 
     /** Mutex to prevent race between returning query results and noticing that query has been timed-out or cancelled. */
-    protected Object cancelTimeoutMutex = new Object();
+    protected ReentrantLock cancelTimeoutMutex = new ReentrantLock();
 
     private CancelStatus cancelStatus = CancelStatus.NOT_CANCELED;
 
@@ -60,40 +54,18 @@ public abstract class AbstractQuery implements Query {
     protected long timeoutInMillis = 0L;
 
     /** Holds batched commands */
-    protected List<Object> batchedArgs;
-
-    /** The type of this result set (scroll sensitive or in-sensitive) */
-    protected Resultset.Type resultSetType = Type.FORWARD_ONLY;
-
-    /** The number of rows to fetch at a time (currently ignored) */
-    protected int fetchSize = 0;
+    protected List<QueryBindings> batchedArgs;
 
     /** Currently executing a statement? */
     protected final AtomicBoolean statementExecuting = new AtomicBoolean(false);
 
-    /** The database in use */
-    protected String currentDb = null;
-
     /** Has clearWarnings() been called? */
     protected boolean clearWarningsCalled = false;
 
-    /** Elapsed time of the execution */
-    private long executeTime = -1;
-
-    /** Query attributes bindings */
-    protected QueryAttributesBindings queryAttributesBindings;
-
     public AbstractQuery(NativeSession sess) {
-        statementCounter++;
         this.session = sess;
         this.maxAllowedPacket = sess.getPropertySet().getIntegerProperty(PropertyKey.maxAllowedPacket);
         this.charEncoding = sess.getPropertySet().getStringProperty(PropertyKey.characterEncoding).getValue();
-        this.queryAttributesBindings = new NativeQueryAttributesBindings(sess);
-    }
-
-    @Override
-    public int getId() {
-        return this.statementId;
     }
 
     @Override
@@ -102,30 +74,26 @@ public abstract class AbstractQuery implements Query {
     }
 
     @Override
-    public long getExecuteTime() {
-        return this.executeTime;
-    }
-
-    @Override
-    public void setExecuteTime(long executeTime) {
-        this.executeTime = executeTime;
-    }
-
-    @Override
-    public void checkCancelTimeout() {
-        synchronized (this.cancelTimeoutMutex) {
+    public void checkCancelTimeout() throws CJException {
+        cancelTimeoutMutex.lock();
+        try {
             if (this.cancelStatus != CancelStatus.NOT_CANCELED) {
                 CJException cause = this.cancelStatus == CancelStatus.CANCELED_BY_TIMEOUT ? new CJTimeoutException() : new OperationCancelledException();
                 resetCancelledState();
                 throw cause;
             }
+        } finally {
+            cancelTimeoutMutex.unlock();
         }
     }
 
     @Override
     public void resetCancelledState() {
-        synchronized (this.cancelTimeoutMutex) {
+        cancelTimeoutMutex.lock();
+        try {
             this.cancelStatus = CancelStatus.NOT_CANCELED;
+        } finally {
+            cancelTimeoutMutex.unlock();
         }
     }
 
@@ -141,59 +109,30 @@ public abstract class AbstractQuery implements Query {
     }
 
     @Override
-    public Object getCancelTimeoutMutex() {
+    public ReentrantLock getCancelTimeoutMutex() {
         return this.cancelTimeoutMutex;
     }
 
     @Override
     public void closeQuery() {
-        this.queryAttributesBindings = null;
         this.session = null;
     }
 
-    @Override
-    public void addBatch(Object batch) {
+    public void addBatch(QueryBindings batch) {
         if (this.batchedArgs == null) {
             this.batchedArgs = new ArrayList<>();
         }
         this.batchedArgs.add(batch);
     }
 
-    @Override
-    public List<Object> getBatchedArgs() {
+    public List<QueryBindings> getBatchedArgs() {
         return this.batchedArgs == null ? null : Collections.unmodifiableList(this.batchedArgs);
     }
 
-    @Override
     public void clearBatchedArgs() {
         if (this.batchedArgs != null) {
             this.batchedArgs.clear();
         }
-    }
-
-    @Override
-    public QueryAttributesBindings getQueryAttributesBindings() {
-        return this.queryAttributesBindings;
-    }
-
-    @Override
-    public int getResultFetchSize() {
-        return this.fetchSize;
-    }
-
-    @Override
-    public void setResultFetchSize(int fetchSize) {
-        this.fetchSize = fetchSize;
-    }
-
-    @Override
-    public Resultset.Type getResultType() {
-        return this.resultSetType;
-    }
-
-    @Override
-    public void setResultType(Resultset.Type resultSetType) {
-        this.resultSetType = resultSetType;
     }
 
     @Override
@@ -207,17 +146,17 @@ public abstract class AbstractQuery implements Query {
     }
 
     @Override
-    public CancelQueryTask startQueryTimer(Query stmtToCancel, long timeout) {
-        if (this.session.getPropertySet().getBooleanProperty(PropertyKey.enableQueryTimeouts).getValue() && timeout != 0) {
-            CancelQueryTaskImpl timeoutTask = new CancelQueryTaskImpl(stmtToCancel);
-            this.session.getCancelTimer().schedule(timeoutTask, timeout);
+    public CancelQueryTask startQueryTimer(Query query, long timeout) {
+        if (timeout > 0) {
+            var timeoutTask = new CancelQueryTaskImpl(query);
+            CancelQueryTaskImpl.TIMER.schedule(timeoutTask, timeout);
             return timeoutTask;
         }
         return null;
     }
 
     @Override
-    public void stopQueryTimer(CancelQueryTask timeoutTask, boolean rethrowCancelReason, boolean checkCancelTimeout) {
+    public void stopQueryTimer(CancelQueryTask timeoutTask, boolean rethrowCancelReason, boolean checkCancelTimeout) throws CJException {
         if (timeoutTask != null) {
             timeoutTask.cancel();
 
@@ -226,7 +165,7 @@ public abstract class AbstractQuery implements Query {
                 throw ExceptionFactory.createException(t.getMessage(), t);
             }
 
-            this.session.getCancelTimer().purge();
+            CancelQueryTaskImpl.TIMER.purge();
 
             if (checkCancelTimeout) {
                 checkCancelTimeout();
@@ -237,16 +176,6 @@ public abstract class AbstractQuery implements Query {
     @Override
     public AtomicBoolean getStatementExecuting() {
         return this.statementExecuting;
-    }
-
-    @Override
-    public String getCurrentDatabase() {
-        return this.currentDb;
-    }
-
-    @Override
-    public void setCurrentDatabase(String currentDb) {
-        this.currentDb = currentDb;
     }
 
     @Override

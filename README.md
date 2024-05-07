@@ -1,84 +1,117 @@
 # MySQL Connector/J
+patched for cloud env and core-ng framework
 
-[![GitHub top language](https://img.shields.io/github/languages/top/mysql/mysql-connector-j?label=Java&color=5382a1)](https://github.com/mysql/mysql-connector-j/tree/release/8.x/src) [![License: GPLv2 with FOSS exception](https://img.shields.io/badge/License-GPLv2_with_FOSS_exception-c30014.svg)](LICENSE) [![Maven Central](https://img.shields.io/maven-central/v/com.mysql/mysql-connector-j?label=Maven%20Central)](https://central.sonatype.com/search?q=g%3Acom.mysql+a%3Amysql-connector-j)
+```kotlin
+maven {
+    url = uri("https://neowu.github.io/maven-repo/")
+    content {
+        includeGroupByRegex("core\\.framework.*")
+    }
+}
 
-MySQL provides connectivity for client applications developed in the Java programming language with MySQL Connector/J, a driver that implements the [Java Database Connectivity (JDBC) API](https://www.oracle.com/technetwork/java/javase/jdbc/) and also [MySQL X DevAPI](https://dev.mysql.com/doc/x-devapi-userguide/en/).
-
-MySQL Connector/J 8.4 is a JDBC Type 4 driver that is compatible with the [JDBC 4.2](https://docs.oracle.com/javase/8/docs/technotes/guides/jdbc/) specification. The Type 4 designation means that the driver is a pure Java implementation of the MySQL protocol and does not rely on the MySQL client libraries.
-
-The driver also contains an implementation of [MySQL X DevAPI](https://dev.mysql.com/doc/x-devapi-userguide/en/), an application programming interface for working with [MySQL as a Document Store](https://dev.mysql.com/doc/refman/en/document-store.html) through CRUD-based, NoSQL operations.
-
-For more information, please visit the official [MySQL Connector/J documentation](https://dev.mysql.com/doc/connector-j/en/).
-
-## Licensing
-
-Please refer to the [README](README) and [LICENSE](LICENSE) files, available in this repository, and the [Legal Notices in the MySQL Connector/J documentation](https://dev.mysql.com/doc/connector-j/en/preface.html) for further details.
-
-## Getting the Latest Release
-
-MySQL Connector/J is free for usage under the terms of the specified licensing and it runs on any operating system that is able to run a Java Virtual Machine.
-
-### Download and Install
-
-MySQL Connector/J can be installed from pre-compiled packages that can be downloaded from the [MySQL Connector/J download page](https://dev.mysql.com/downloads/connector/j/). Installing MySQL Connector/J only requires obtaining the corresponding JAR file from the downloaded bundle or installer and including it in the application's CLASSPATH.
-
-According to how you use MySQL Connector/J, you may also need to install the following third-party libraries on your system for it to work:
-* Protocol Buffers (protobuf-java) is required for using X DevAPI
-* Oracle Cloud Infrastructure SDK for Java (oci-java-sdk) is required to support OCI AIM authentication
-* Simple Logging Facade API (slf4j-api) is required for using the logging capabilities provided by the default implementation of org.slf4j.Logger.Slf4JLogger by MySQL Connector/J 
-
-### As a Maven Dependency
-
-Alternatively, MySQL Connector/J can be obtained automatically via [Maven's dependency management](https://central.sonatype.com/search?q=g%3Acom.mysql+a%3Amysql-connector-j) by adding the following configuration in the application's Project Object Model (POM) file:
-
-```xml
-<dependency>
-  <groupId>com.mysql</groupId>
-  <artifactId>mysql-connector-j</artifactId>
-  <version>8.4.0</version>
-</dependency>
+dependencies {
+    runtime("core.framework.mysql:mysql-connector-j:8.4.0-r2")
+}
 ```
 
-MySQL Connector/J's own Project Object Model (POM) file specifies a transitive dependency to Protocol Buffers (protobuf-java) since it is required for using X DevAPI. However, if you do not use the X DevAPI features, you may also want to add a dependency exclusion to avoid linking the unneeded sub-library. For example:
+# Changes
+* removed all synchronization to be virtual thread friendly, connection/statement/resultSet are not thread safe anymore
+* added google cloud auth support for cancel query timer
+* simplify code used by core-ng framework
 
-```xml
-<dependency>
-  <groupId>com.mysql</groupId>
-  <artifactId>mysql-connector-j</artifactId>
-  <version>8.4.0</version>
-  <exclusions>
-    <exclusion>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-    </exclusion>
-  </exclusions> 
-</dependency>
-```
+# Removed features
+* PropertyKey.cacheServerConfiguration: only loaded once when connect to mysql
+* AbandonedConnectionCleanupThread
+* PropertyKey.useServerPrepStmts
+* PropertyKey.useCursorFetch
 
-### Build From Source
+* PropertyKey.autoSlowLog
+* PropertyKey.logSlowQueries
+* PropertyKey.slowQueryThresholdMillis
+* PropertyKey.profileSQL
+* PropertyKey.explainSlowQueries
+* PropertyKey.profilerEventHandler 
+* PropertyKey.maxQuerySizeToLog
+* PropertyKey.dumpQueriesOnException
+* PropertyKey.useUsageAdvisor
+* PropertyKey.resultSetSizeThreshold
+* PropertyKey.emulateUnsupportedPstmts
+* ProfilerEventHandler
+* AuthenticationLdapSaslClientPlugin, AuthenticationKerberosClient
 
-This driver can also be complied and installed from the source available in this repository. Please refer to the MySQL Connector/J documentation for [detailed instructions](https://dev.mysql.com/doc/connector-j/en/connector-j-installing-source.html) on how to do it.
+* PropertyKey.gatherPerfMetrics
 
-### GitHub Repository
+* PropertyKey.cacheResultSetMetadata
+* PropertyKey.metadataCacheSize
 
-This repository contains the MySQL Connector/J source code as per the latest release. No changes are made in this repository between releases.
+* SqlTimeValueFactory, SqlTimestampValueFactory, UtilCalendarValueFactory, SqlDateValueFactory
+* removed synchronization from PerConnectionLRUFactory
+* UpdatableResultSet
 
-## Contributing
+* PropertyKey.dontTrackOpenResources
+* PropertyKey.holdResultsOpenOverStatementClose
+* CallableStatement
+* PropertyKey.preserveInstants (always use as true)
+* InputStream/Reader/Blob/Clob/SQLXML/byte[] (not use streaming and binary encoding)
+* ExceptionInterceptors
+* QueryAttribute
+* PropertyKey.allowLoadLocalInfile
+* DataSource / XA
+* PropertyKey.pedantic
+* streaming mode and binary encoding
+* connectionLifecycleInterceptors
+* MetaData
+* PropertyKey.paranoid
+* PropertyKey.trackSessionState
+* ClientInfoProvider
+* auto-reconnect
+* Savepoint
+* PING_MARKER
+* Property.createDatabaseIfNotExist
+* PropertyKey.useCompression
+* PropertyKey.interactiveClient
+* old JDBC behavior flags, 
+* "LOAD DATA LOCAL INFILE"
+* PropertyKey.useConfigs
+* PropertyKey.alwaysSendSetIsolation / PropertyKey.useLocalSessionState (only minor impact on connectionImpl, use false and true behavior, not as default)
+* PropertyKey.useLocalTransactionState
+* PropertyKey.ignoreNonTxTables
+* PropertyKey.useOnlyServerErrorMessages
+* PropertyKey.zeroDateTimeBehavior
+* PropertyKey.includeInnodbStatusInDeadlockExceptions/includeThreadDumpInDeadlockExceptions/includeThreadNamesAsStatementComment/autoGenerateTestcaseScript (not useful in microservice arch)
+* internal query execution time tracking
+* simplify String encoding, remove NCHAR/NVARCHAR, use VARCHAR w/ utf8mb4 instead
+* PropertyKey.cacheDefaultTimeZone
+* PropertyKey.forceConnectionTimeZoneToSession
+* PropertyKey.databaseTerm
+* added QueryDiagnostic, removed QueryInterceptor
+* removed Load balancing and replication support
+* not allowed sql_mode: ANSI_QUOTES, NO_BACKSLASH_ESCAPES, TIME_TRUNCATE_FRACTIONAL
+* simplified character encoding handling, removed PropertyKey.characterSetResults / PropertyKey.passwordCharacterEncoding
+* simplified serverTruncatesFractionalSecond
 
-There are a few ways to contribute to the MySQL Connector/J code. Please refer to the [contributing guidelines](CONTRIBUTING.md) for additional information.
+* Statement methods (in favor of ClientPreparedStatement)
+* PropertyKey.processEscapeCodesForPrepStmts / PropertyKey.scrollTolerantForwardOnly
 
-## Additional Resources
+* PropertyKey.propertiesTransform
+* Connection Proxy / dnsSrv / HA
+* Connection read only
+* PropertyKey.padCharsWithSpace
 
-* [MySQL Connector/J Developer Guide](https://dev.mysql.com/doc/connector-j/en/).
-* [MySQL Connector/J X DevAPI Reference](https://dev.mysql.com/doc/dev/connector-j/).
-* [MySQL Connector/J, JDBC and Java forum](https://forums.mysql.com/list.php?39).
-* [`#connectors` channel in MySQL Community Slack](https://mysqlcommunity.slack.com/messages/connectors). ([Sign-up](https://lefred.be/mysql-community-on-slack/) required if you do not have an Oracle account.)
-* [@MySQL on Twitter](https://twitter.com/MySQL).
-* [MySQL Blog](https://blogs.oracle.com/mysql/).
-* [MySQL Connectors Blog archive](https://dev.mysql.com/blog-archive/?cat=Connectors%20%2F%20Languages).
-* [MySQL Newsletter](https://www.mysql.com/news-and-events/newsletter/).
-* [MySQL Bugs Database](https://bugs.mysql.com/).
+* PropertyKey.socksProxyHost/socksProxyPort/socksProxyRemoteDns
+* PropertyKey.jdbcCompliantTruncation
+* PropertyKey.socketFactory (always use TCP protocol and StandardSocketFactory)
+* PropertyKey.authenticationPlugins/disabledAuthenticationPlugins/defaultAuthenticationPlugin (replace with default values)
 
-For more information about this and other MySQL products, please visit [MySQL Contact & Questions](https://www.mysql.com/about/contact/).
+* OpenTelemetry
+* PropertyKey.queryInfoCacheFactory (always use PerConnectionLRUFactory)
+* PropertyKey.allowNanAndInf
 
-[![Twitter Follow](https://img.shields.io/twitter/follow/MySQL.svg?label=Follow%20%40MySQL&style=social)](https://twitter.com/intent/follow?screen_name=MySQL)
+* PropertyKey.enableQueryTimeouts
+
+# TODO
+remove com.mysql.cj.jdbc.JdbcStatement.removeOpenResultSet
+remove SessionEventListener?
+support cloud iam auth thru HostInfo natively?
+remove WrongArgumentException?
+remove com.mysql.cj.jdbc.result.ResultSetImpl.prev and all non-forward-only methods? 

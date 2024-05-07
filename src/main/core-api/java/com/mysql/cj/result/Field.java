@@ -45,7 +45,7 @@ public class Field implements ProtocolEntity {
 
     private String fullName = null;
 
-    private long length; // Internal length of the field;
+    private final long length; // Internal length of the field;
 
     private int mysqlTypeId = -1; // the MySQL type ID in legacy protocol
 
@@ -200,10 +200,6 @@ public class Field implements ProtocolEntity {
         return this.mysqlTypeId;
     }
 
-    public void setMysqlTypeId(int id) {
-        this.mysqlTypeId = id;
-    }
-
     public String getName() {
         return this.columnName.toString();
     }
@@ -232,16 +228,8 @@ public class Field implements ProtocolEntity {
         return (this.colFlag & MysqlType.FIELD_FLAG_BINARY) > 0;
     }
 
-    public void setBinary() {
-        this.colFlag |= MysqlType.FIELD_FLAG_BINARY;
-    }
-
     public boolean isBlob() {
         return (this.colFlag & MysqlType.FIELD_FLAG_BLOB) > 0;
-    }
-
-    public void setBlob() {
-        this.colFlag |= MysqlType.FIELD_FLAG_BLOB;
     }
 
     public boolean isMultipleKey() {
@@ -254,10 +242,6 @@ public class Field implements ProtocolEntity {
 
     public boolean isPrimaryKey() {
         return (this.colFlag & MysqlType.FIELD_FLAG_PRIMARY_KEY) > 0;
-    }
-
-    public boolean isFromFunction() {
-        return this.originalTableName.length() == 0;
     }
 
     /**
@@ -363,31 +347,6 @@ public class Field implements ProtocolEntity {
         return this.length <= 1;
     }
 
-    public boolean getValueNeedsQuoting() {
-        switch (this.mysqlType) {
-            case BIGINT:
-            case BIGINT_UNSIGNED:
-            case BIT:
-            case DECIMAL:
-            case DECIMAL_UNSIGNED:
-            case DOUBLE:
-            case DOUBLE_UNSIGNED:
-            case INT:
-            case INT_UNSIGNED:
-            case MEDIUMINT:
-            case MEDIUMINT_UNSIGNED:
-            case FLOAT:
-            case FLOAT_UNSIGNED:
-            case SMALLINT:
-            case SMALLINT_UNSIGNED:
-            case TINYINT:
-            case TINYINT_UNSIGNED:
-                return false;
-            default:
-                return true;
-        }
-    }
-
     public int getCollationIndex() {
         return this.collationIndex;
     }
@@ -395,17 +354,4 @@ public class Field implements ProtocolEntity {
     public MysqlType getMysqlType() {
         return this.mysqlType;
     }
-
-    public void setMysqlType(MysqlType mysqlType) {
-        this.mysqlType = mysqlType;
-    }
-
-    public short getFlags() {
-        return this.colFlag;
-    }
-
-    public void setFlags(short colFlag) {
-        this.colFlag = colFlag;
-    }
-
 }

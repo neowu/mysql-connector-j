@@ -23,7 +23,8 @@ package com.mysql.cj.protocol.result;
 import com.mysql.cj.Messages;
 import com.mysql.cj.MysqlType;
 import com.mysql.cj.exceptions.DataReadException;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
+import com.mysql.cj.exceptions.WrongArgumentException;
+import com.mysql.cj.jdbc.exceptions.SQLExceptionsMapping;
 import com.mysql.cj.protocol.ColumnDefinition;
 import com.mysql.cj.protocol.ResultsetRow;
 import com.mysql.cj.protocol.ValueDecoder;
@@ -31,12 +32,10 @@ import com.mysql.cj.result.Field;
 import com.mysql.cj.result.Row;
 import com.mysql.cj.result.ValueFactory;
 
+import java.sql.SQLException;
+
 public abstract class AbstractResultsetRow implements ResultsetRow {
-
-    protected ExceptionInterceptor exceptionInterceptor;
-
-    protected AbstractResultsetRow(ExceptionInterceptor exceptionInterceptor) {
-        this.exceptionInterceptor = exceptionInterceptor;
+    protected AbstractResultsetRow() {
     }
 
     /**
@@ -66,7 +65,7 @@ public abstract class AbstractResultsetRow implements ResultsetRow {
      *            value type
      * @return value
      */
-    private <T> T decodeAndCreateReturnValue(int columnIndex, byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    private <T> T decodeAndCreateReturnValue(int columnIndex, byte[] bytes, int offset, int length, ValueFactory<T> vf) throws DataReadException {
         Field f = this.metadata.getFields()[columnIndex];
 
         // First, figure out which decoder method to call basing on the protocol value type from metadata;
@@ -226,15 +225,19 @@ public abstract class AbstractResultsetRow implements ResultsetRow {
      *            value type
      * @return value
      */
-    protected <T> T getValueFromBytes(int columnIndex, byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    protected <T> T getValueFromBytes(int columnIndex, byte[] bytes, int offset, int length, ValueFactory<T> vf) throws SQLException {
         if (getNull(columnIndex)) {
             return vf.createFromNull();
         }
 
-        // value factory may return null for zeroDateTimeBehavior=CONVERT_TO_NULL so check the return value
-        T retVal = decodeAndCreateReturnValue(columnIndex, bytes, offset, length, vf);
-        this.wasNull = retVal == null;
-        return retVal;
+        try {
+            // value factory may return null for zeroDateTimeBehavior=CONVERT_TO_NULL so check the return value
+            T retVal = decodeAndCreateReturnValue(columnIndex, bytes, offset, length, vf);
+            this.wasNull = retVal == null;
+            return retVal;
+        } catch (DataReadException e) {
+            throw SQLExceptionsMapping.translateException(e);
+        }
     }
 
     @Override

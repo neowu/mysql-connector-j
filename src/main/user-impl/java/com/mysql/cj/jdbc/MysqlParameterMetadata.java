@@ -20,17 +20,16 @@
 
 package com.mysql.cj.jdbc;
 
-import java.sql.ParameterMetaData;
-import java.sql.SQLException;
-
 import com.mysql.cj.Messages;
 import com.mysql.cj.MysqlType;
 import com.mysql.cj.Session;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
 import com.mysql.cj.exceptions.MysqlErrorNumbers;
 import com.mysql.cj.jdbc.exceptions.SQLError;
 import com.mysql.cj.jdbc.result.ResultSetMetaData;
 import com.mysql.cj.result.Field;
+
+import java.sql.ParameterMetaData;
+import java.sql.SQLException;
 
 public class MysqlParameterMetadata implements ParameterMetaData {
 
@@ -40,13 +39,10 @@ public class MysqlParameterMetadata implements ParameterMetaData {
 
     int parameterCount = 0;
 
-    private ExceptionInterceptor exceptionInterceptor;
-
-    public MysqlParameterMetadata(Session session, Field[] fieldInfo, int parameterCount, ExceptionInterceptor exceptionInterceptor) {
-        this.metadata = new ResultSetMetaData(session, fieldInfo, false, true, exceptionInterceptor);
+    public MysqlParameterMetadata(Session session, Field[] fieldInfo, int parameterCount) {
+        this.metadata = new ResultSetMetaData(session, fieldInfo, true);
 
         this.parameterCount = parameterCount;
-        this.exceptionInterceptor = exceptionInterceptor;
     }
 
     /**
@@ -80,8 +76,7 @@ public class MysqlParameterMetadata implements ParameterMetaData {
 
     private void checkAvailable() throws SQLException {
         if (this.metadata == null || this.metadata.getFields() == null) {
-            throw SQLError.createSQLException(Messages.getString("MysqlParameterMetadata.0"), MysqlErrorNumbers.SQL_STATE_DRIVER_NOT_CAPABLE,
-                    this.exceptionInterceptor);
+            throw SQLError.createSQLException(Messages.getString("MysqlParameterMetadata.0"), MysqlErrorNumbers.SQL_STATE_DRIVER_NOT_CAPABLE);
         }
     }
 
@@ -171,12 +166,12 @@ public class MysqlParameterMetadata implements ParameterMetaData {
     private void checkBounds(int paramNumber) throws SQLException {
         if (paramNumber < 1) {
             throw SQLError.createSQLException(Messages.getString("MysqlParameterMetadata.1", new Object[] { paramNumber }),
-                    MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, this.exceptionInterceptor);
+                    MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT);
         }
 
         if (paramNumber > this.parameterCount) {
             throw SQLError.createSQLException(Messages.getString("MysqlParameterMetadata.2", new Object[] { paramNumber, this.parameterCount }),
-                    MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, this.exceptionInterceptor);
+                    MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT);
 
         }
     }
@@ -194,7 +189,7 @@ public class MysqlParameterMetadata implements ParameterMetaData {
             return iface.cast(this);
         } catch (ClassCastException cce) {
             throw SQLError.createSQLException(Messages.getString("Common.UnableToUnwrap", new Object[] { iface.toString() }),
-                    MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT, this.exceptionInterceptor);
+                    MysqlErrorNumbers.SQL_STATE_ILLEGAL_ARGUMENT);
         }
     }
 

@@ -26,8 +26,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.mysql.cj.Messages;
+import com.mysql.cj.exceptions.DataConversionException;
 import com.mysql.cj.exceptions.DataReadException;
 import com.mysql.cj.exceptions.NumberOutOfRange;
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.InternalDate;
 import com.mysql.cj.protocol.InternalTime;
 import com.mysql.cj.protocol.InternalTimestamp;
@@ -66,57 +68,57 @@ public class MysqlTextValueDecoder implements ValueDecoder {
     public static final int MAX_SIGNED_LONG_LEN = 20;
 
     @Override
-    public <T> T decodeDate(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeDate(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws DataReadException {
         return vf.createFromDate(getDate(bytes, offset, length));
     }
 
     @Override
-    public <T> T decodeTime(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf) {
+    public <T> T decodeTime(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf) throws DataReadException {
         return vf.createFromTime(getTime(bytes, offset, length, scale));
     }
 
     @Override
-    public <T> T decodeTimestamp(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf) {
+    public <T> T decodeTimestamp(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf) throws DataReadException {
         return vf.createFromTimestamp(getTimestamp(bytes, offset, length, scale));
     }
 
     @Override
-    public <T> T decodeDatetime(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf) {
+    public <T> T decodeDatetime(byte[] bytes, int offset, int length, int scale, ValueFactory<T> vf) throws DataReadException {
         return vf.createFromDatetime(getTimestamp(bytes, offset, length, scale));
     }
 
     @Override
-    public <T> T decodeUInt1(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeUInt1(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return vf.createFromLong(getInt(bytes, offset, offset + length));
     }
 
     @Override
-    public <T> T decodeInt1(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeInt1(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return vf.createFromLong(getInt(bytes, offset, offset + length));
     }
 
     @Override
-    public <T> T decodeUInt2(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeUInt2(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return vf.createFromLong(getInt(bytes, offset, offset + length));
     }
 
     @Override
-    public <T> T decodeInt2(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeInt2(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return vf.createFromLong(getInt(bytes, offset, offset + length));
     }
 
     @Override
-    public <T> T decodeUInt4(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeUInt4(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return vf.createFromLong(getLong(bytes, offset, offset + length));
     }
 
     @Override
-    public <T> T decodeInt4(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeInt4(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return vf.createFromLong(getInt(bytes, offset, offset + length));
     }
 
     @Override
-    public <T> T decodeUInt8(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeUInt8(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         // treat as a signed long if possible to avoid BigInteger overhead
         if (length <= MAX_SIGNED_LONG_LEN - 1 && bytes[offset] >= '0' && bytes[offset] <= '8') {
             return decodeInt8(bytes, offset, length, vf);
@@ -125,47 +127,47 @@ public class MysqlTextValueDecoder implements ValueDecoder {
     }
 
     @Override
-    public <T> T decodeInt8(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeInt8(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return vf.createFromLong(getLong(bytes, offset, offset + length));
     }
 
     @Override
-    public <T> T decodeFloat(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeFloat(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return decodeDouble(bytes, offset, length, vf);
     }
 
     @Override
-    public <T> T decodeDouble(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeDouble(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return vf.createFromDouble(getDouble(bytes, offset, length));
     }
 
     @Override
-    public <T> T decodeDecimal(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeDecimal(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         BigDecimal d = new BigDecimal(StringUtils.toAsciiCharArray(bytes, offset, length));
         return vf.createFromBigDecimal(d);
     }
 
     @Override
-    public <T> T decodeByteArray(byte[] bytes, int offset, int length, Field f, ValueFactory<T> vf) {
+    public <T> T decodeByteArray(byte[] bytes, int offset, int length, Field f, ValueFactory<T> vf) throws DataReadException {
         return vf.createFromBytes(bytes, offset, length, f);
     }
 
     @Override
-    public <T> T decodeBit(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeBit(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws NumberOutOfRange, DataConversionException {
         return vf.createFromBit(bytes, offset, length);
     }
 
     @Override
-    public <T> T decodeSet(byte[] bytes, int offset, int length, Field f, ValueFactory<T> vf) {
+    public <T> T decodeSet(byte[] bytes, int offset, int length, Field f, ValueFactory<T> vf) throws DataReadException {
         return decodeByteArray(bytes, offset, length, f, vf);
     }
 
     @Override
-    public <T> T decodeYear(byte[] bytes, int offset, int length, ValueFactory<T> vf) {
+    public <T> T decodeYear(byte[] bytes, int offset, int length, ValueFactory<T> vf) throws DataReadException {
         return vf.createFromYear(getLong(bytes, offset, offset + length));
     }
 
-    public static int getInt(byte[] buf, int offset, int endpos) throws NumberFormatException {
+    public static int getInt(byte[] buf, int offset, int endpos) throws NumberFormatException, NumberOutOfRange {
         long l = getLong(buf, offset, endpos);
         if (l < Integer.MIN_VALUE || l > Integer.MAX_VALUE) {
             throw new NumberOutOfRange(Messages.getString("StringUtils.badIntFormat", new Object[] { StringUtils.toString(buf, offset, endpos - offset) }));
@@ -173,7 +175,7 @@ public class MysqlTextValueDecoder implements ValueDecoder {
         return (int) l;
     }
 
-    public static long getLong(byte[] buf, int offset, int endpos) throws NumberFormatException {
+    public static long getLong(byte[] buf, int offset, int endpos) throws NumberFormatException, NumberOutOfRange {
         int base = 10;
 
         int s = offset;
@@ -272,7 +274,7 @@ public class MysqlTextValueDecoder implements ValueDecoder {
         return matcher.matches();
     }
 
-    public static InternalDate getDate(byte[] bytes, int offset, int length) {
+    public static InternalDate getDate(byte[] bytes, int offset, int length) throws DataReadException {
         if (length != DATE_BUF_LEN) {
             throw new DataReadException(Messages.getString("ResultSet.InvalidLengthForType", new Object[] { length, "DATE" }));
         }
@@ -282,7 +284,7 @@ public class MysqlTextValueDecoder implements ValueDecoder {
         return new InternalDate(year, month, day);
     }
 
-    public static InternalTime getTime(byte[] bytes, int offset, int length, int scale) {
+    public static InternalTime getTime(byte[] bytes, int offset, int length, int scale) throws DataReadException {
         int pos = 0;
         // used to track the length of the current time segment during parsing
         int segmentLen;
@@ -355,7 +357,7 @@ public class MysqlTextValueDecoder implements ValueDecoder {
         return new InternalTime(hours, minutes, seconds, nanos, scale);
     }
 
-    public static InternalTimestamp getTimestamp(byte[] bytes, int offset, int length, int scale) {
+    public static InternalTimestamp getTimestamp(byte[] bytes, int offset, int length, int scale) throws DataReadException {
         if (length < TIMESTAMP_STR_LEN_NO_FRAC || length > TIMESTAMP_STR_LEN_WITH_MICROS && length != TIMESTAMP_STR_LEN_WITH_NANOS) {
             throw new DataReadException(Messages.getString("ResultSet.InvalidLengthForType", new Object[] { length, "TIMESTAMP" }));
         } else if (length != TIMESTAMP_STR_LEN_NO_FRAC) {

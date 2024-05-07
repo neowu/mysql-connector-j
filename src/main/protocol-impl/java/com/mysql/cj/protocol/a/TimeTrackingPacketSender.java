@@ -55,15 +55,4 @@ public class TimeTrackingPacketSender implements MessageSender<NativePacketPaylo
     public long getPreviousPacketSentTime() {
         return this.previousPacketSentTime;
     }
-
-    @Override
-    public MessageSender<NativePacketPayload> undecorateAll() {
-        return this.packetSender.undecorateAll();
-    }
-
-    @Override
-    public MessageSender<NativePacketPayload> undecorate() {
-        return this.packetSender;
-    }
-
 }

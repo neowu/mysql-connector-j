@@ -20,15 +20,17 @@
 
 package com.mysql.cj.protocol.a;
 
-import java.io.IOException;
-import java.util.Optional;
-
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.conf.RuntimeProperty;
+import com.mysql.cj.exceptions.CJException;
+import com.mysql.cj.exceptions.CJPacketTooBigException;
 import com.mysql.cj.protocol.ProtocolEntityFactory;
 import com.mysql.cj.protocol.ProtocolEntityReader;
 import com.mysql.cj.protocol.ResultsetRow;
+
+import java.io.IOException;
+import java.util.Optional;
 
 public class ResultsetRowReader implements ProtocolEntityReader<ResultsetRow, NativePacketPayload> {
 
@@ -56,14 +58,13 @@ public class ResultsetRowReader implements ProtocolEntityReader<ResultsetRow, Na
      *             if an error occurs
      */
     @Override
-    public ResultsetRow read(ProtocolEntityFactory<ResultsetRow, NativePacketPayload> sf) throws IOException {
+    public ResultsetRow read(ProtocolEntityFactory<ResultsetRow, NativePacketPayload> sf) throws IOException, CJException {
         AbstractRowFactory rf = (AbstractRowFactory) sf;
         NativePacketPayload rowPacket = null;
         NativePacketHeader hdr = this.protocol.getPacketReader().readHeader();
 
         // read the entire packet(s)
-        rowPacket = this.protocol.getPacketReader()
-                .readMessage(rf.canReuseRowPacketForBufferRow() ? Optional.ofNullable(this.protocol.getReusablePacket()) : Optional.empty(), hdr);
+        rowPacket = this.protocol.getPacketReader().readMessage(Optional.empty(), hdr);
         this.protocol.checkErrorMessage(rowPacket);
         // Didn't read an error, so re-position to beginning of packet in order to read result set data
         rowPacket.setPosition(rowPacket.getPosition() - 1);

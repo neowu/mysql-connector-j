@@ -49,11 +49,6 @@ public class ResultsetRowsStatic extends AbstractResultsetRows implements Result
     }
 
     @Override
-    public void addRow(Row row) {
-        this.rows.add(row);
-    }
-
-    @Override
     public void afterLast() {
         if (this.rows.size() > 0) {
             this.currentPositionInFetchedRows = this.rows.size();
@@ -112,7 +107,7 @@ public class ResultsetRowsStatic extends AbstractResultsetRows implements Result
 
     @Override
     public boolean isEmpty() {
-        return this.rows.size() == 0;
+        return this.rows.isEmpty();
     }
 
     @Override
@@ -170,11 +165,6 @@ public class ResultsetRowsStatic extends AbstractResultsetRows implements Result
     @Override
     public int size() {
         return this.rows.size();
-    }
-
-    @Override
-    public boolean wasEmpty() {
-        return this.rows != null && this.rows.size() == 0;
     }
 
 }

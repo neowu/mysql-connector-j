@@ -163,7 +163,7 @@ public class NativePacketPayload implements Message {
      * @param bufLengthToSet
      *            length
      */
-    public void setPayloadLength(int bufLengthToSet) {
+    public void setPayloadLength(int bufLengthToSet) throws WrongArgumentException {
         if (bufLengthToSet > this.byteBuffer.length) {
             throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("Buffer.0"));
         }
@@ -581,7 +581,7 @@ public class NativePacketPayload implements Message {
      *            if null then platform default encoding is used
      * @return string
      */
-    public String readString(StringSelfDataType type, String encoding) {
+    public String readString(StringSelfDataType type, String encoding) throws WrongArgumentException {
         String res = null;
         switch (type) {
             case STRING_TERM:
@@ -618,7 +618,7 @@ public class NativePacketPayload implements Message {
      *            length
      * @return string
      */
-    public String readString(StringLengthDataType type, String encoding, int len) {
+    public String readString(StringLengthDataType type, String encoding, int len) throws WrongArgumentException {
         String res = null;
         switch (type) {
             case STRING_FIXED:

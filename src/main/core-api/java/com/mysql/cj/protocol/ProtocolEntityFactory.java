@@ -20,6 +20,7 @@
 
 package com.mysql.cj.protocol;
 
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.CJOperationNotSupportedException;
 import com.mysql.cj.exceptions.ExceptionFactory;
 
@@ -32,19 +33,7 @@ public interface ProtocolEntityFactory<T, M extends Message> {
      *            {@link Message} instance
      * @return T
      */
-    default T createFromMessage(M message) {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not allowed");
-    }
-
-    default Resultset.Type getResultSetType() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not allowed");
-    }
-
-    default Resultset.Concurrency getResultSetConcurrency() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not allowed");
-    }
-
-    default int getFetchSize() {
+    default T createFromMessage(M message) throws CJOperationNotSupportedException {
         throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not allowed");
     }
 
@@ -55,7 +44,7 @@ public interface ProtocolEntityFactory<T, M extends Message> {
      *            the {@link ProtocolEntity} to create from
      * @return a new ProtocolEntity
      */
-    default T createFromProtocolEntity(ProtocolEntity protocolEntity) {
+    default T createFromProtocolEntity(ProtocolEntity protocolEntity) throws CJException {
         throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not allowed");
     }
 

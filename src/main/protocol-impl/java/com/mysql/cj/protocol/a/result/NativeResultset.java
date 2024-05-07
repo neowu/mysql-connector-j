@@ -20,14 +20,14 @@
 
 package com.mysql.cj.protocol.a.result;
 
-import java.util.HashMap;
-
 import com.mysql.cj.protocol.ColumnDefinition;
 import com.mysql.cj.protocol.Resultset;
 import com.mysql.cj.protocol.ResultsetRows;
 import com.mysql.cj.result.DefaultColumnDefinition;
 import com.mysql.cj.result.Field;
 import com.mysql.cj.result.Row;
+
+import java.util.HashMap;
 
 public class NativeResultset implements Resultset {
 
@@ -38,9 +38,6 @@ public class NativeResultset implements Resultset {
     protected ResultsetRows rowData;
 
     protected Resultset nextResultset = null;
-
-    /** The id (used when profiling) to identify us */
-    protected int resultId;
 
     /** How many rows were affected by UPDATE/INSERT/DELETE? */
     protected long updateCount;
@@ -81,18 +78,12 @@ public class NativeResultset implements Resultset {
         if (this.rowData.size() > 0) {
             if (this.updateCount == 1) {
                 if (this.thisRow == null) {
-                    this.rowData.close(); // empty result set
                     this.updateCount = -1;
                 }
             }
         } else {
             this.thisRow = null;
         }
-    }
-
-    @Override
-    public void setColumnDefinition(ColumnDefinition metadata) {
-        this.columnDefinition = metadata;
     }
 
     @Override
@@ -106,11 +97,6 @@ public class NativeResultset implements Resultset {
     }
 
     @Override
-    public int getResultId() {
-        return this.resultId;
-    }
-
-    @Override
     public void initRowsWithMetadata() {
         if (this.rowData != null) {
             this.rowData.setMetadata(this.columnDefinition);
@@ -119,7 +105,7 @@ public class NativeResultset implements Resultset {
     }
 
     @Override
-    public synchronized void setNextResultset(Resultset nextResultset) {
+    public void setNextResultset(Resultset nextResultset) {
         this.nextResultset = nextResultset;
     }
 
@@ -127,19 +113,9 @@ public class NativeResultset implements Resultset {
      * @return the nextResultSet, if any, null if none exists.
      */
     @Override
-    public synchronized Resultset getNextResultset() {
+    public Resultset getNextResultset() {
         // read next RS from streamer ?
         return this.nextResultset;
-    }
-
-    /**
-     * We can't do this ourselves, otherwise the contract for
-     * Statement.getMoreResults() won't work correctly.
-     */
-    @Override
-    public synchronized void clearNextResultset() {
-        // TODO release resources of nextResultset, close streamer
-        this.nextResultset = null;
     }
 
     @Override

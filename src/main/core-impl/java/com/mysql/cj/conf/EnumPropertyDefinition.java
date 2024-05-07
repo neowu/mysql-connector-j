@@ -20,12 +20,10 @@
 
 package com.mysql.cj.conf;
 
-import java.util.Arrays;
-
 import com.mysql.cj.Messages;
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
 import com.mysql.cj.util.StringUtils;
+
+import java.util.Arrays;
 
 public class EnumPropertyDefinition<T extends Enum<T>> extends AbstractPropertyDefinition<T> {
 
@@ -33,11 +31,10 @@ public class EnumPropertyDefinition<T extends Enum<T>> extends AbstractPropertyD
 
     private Class<T> enumType;
 
-    public EnumPropertyDefinition(PropertyKey key, T defaultValue, boolean isRuntimeModifiable, String description, String sinceVersion, String category,
-            int orderInCategory) {
-        super(key, defaultValue, isRuntimeModifiable, description, sinceVersion, category, orderInCategory);
+    public EnumPropertyDefinition(PropertyKey key, T defaultValue, boolean isRuntimeModifiable, String description, String category) {
+        super(key, defaultValue, isRuntimeModifiable, description, category);
         if (defaultValue == null) {
-            throw ExceptionFactory.createException("Enum property '" + key.getKeyName() + "' cannot be initialized with null.");
+            throw new Error("Enum property '" + key.getKeyName() + "' cannot be initialized with null.");
         }
         this.enumType = defaultValue.getDeclaringClass();
     }
@@ -48,14 +45,14 @@ public class EnumPropertyDefinition<T extends Enum<T>> extends AbstractPropertyD
     }
 
     @Override
-    public T parseObject(String value, ExceptionInterceptor exceptionInterceptor) {
+    public T parseObject(String value) {
         try {
             return Enum.valueOf(this.enumType, value.toUpperCase());
         } catch (Exception e) {
-            throw ExceptionFactory.createException(
+            throw new Error(
                     Messages.getString("PropertyDefinition.1",
                             new Object[] { getName(), StringUtils.stringArrayToString(getAllowableValues(), "'", "', '", "' or '", "'"), value }),
-                    e, exceptionInterceptor);
+                    e);
         }
     }
 

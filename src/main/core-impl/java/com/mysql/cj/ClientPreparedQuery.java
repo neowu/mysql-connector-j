@@ -20,8 +20,7 @@
 
 package com.mysql.cj;
 
-import com.mysql.cj.conf.PropertyKey;
-import com.mysql.cj.conf.RuntimeProperty;
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.Message;
@@ -42,18 +41,8 @@ public class ClientPreparedQuery extends AbstractQuery implements PreparedQuery 
     /** Command index of currently executing batch command. */
     protected int batchCommandIndex = -1;
 
-    protected RuntimeProperty<Boolean> autoClosePStmtStreams;
-    protected RuntimeProperty<Boolean> useStreamLengthsInPrepStmts;
-
     public ClientPreparedQuery(NativeSession sess) {
         super(sess);
-        this.autoClosePStmtStreams = this.session.getPropertySet().getBooleanProperty(PropertyKey.autoClosePStmtStreams);
-        this.useStreamLengthsInPrepStmts = this.session.getPropertySet().getBooleanProperty(PropertyKey.useStreamLengthsInPrepStmts);
-    }
-
-    @Override
-    public void closeQuery() {
-        super.closeQuery();
     }
 
     @Override
@@ -115,7 +104,7 @@ public class ClientPreparedQuery extends AbstractQuery implements PreparedQuery 
      * @return computed batch size
      */
     @Override
-    public int computeBatchSize(int numBatchedArgs) {
+    public int computeBatchSize(int numBatchedArgs) throws CJException {
         long[] combinedValues = computeMaxParameterSetSizeAndBatchSize(numBatchedArgs);
 
         long maxSizeOfParameterSet = combinedValues[0];
@@ -138,20 +127,20 @@ public class ClientPreparedQuery extends AbstractQuery implements PreparedQuery 
      *             if query is null or empty.
      */
     @Override
-    public void checkNullOrEmptyQuery(String sql) {
+    public void checkNullOrEmptyQuery(String sql) throws WrongArgumentException {
         if (sql == null) {
-            throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("PreparedQuery.0"), this.session.getExceptionInterceptor());
+            throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("PreparedQuery.0"));
         }
 
         if (sql.length() == 0) {
-            throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("PreparedQuery.1"), this.session.getExceptionInterceptor());
+            throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("PreparedQuery.1"));
         }
     }
 
     @Override
-    public String asSql() {
+    public String asSql() throws CJException {
         StringBuilder buf = new StringBuilder();
-        Object batchArg = null;
+        QueryBindings batchArg = null;
         if (this.batchCommandIndex != -1) {
             batchArg = this.batchedArgs.get(this.batchCommandIndex);
         }
@@ -159,13 +148,7 @@ public class ClientPreparedQuery extends AbstractQuery implements PreparedQuery 
         byte[][] staticSqlStrings = this.queryInfo.getStaticSqlParts();
         for (int i = 0; i < this.parameterCount; ++i) {
             buf.append(this.charEncoding != null ? StringUtils.toString(staticSqlStrings[i], this.charEncoding) : StringUtils.toString(staticSqlStrings[i]));
-            String val = null;
-            if (batchArg != null && batchArg instanceof String) {
-                buf.append((String) batchArg);
-                continue;
-            }
-            val = this.batchCommandIndex == -1 ? this.queryBindings == null ? null : this.queryBindings.getBindValues()[i].getString()
-                    : ((QueryBindings) batchArg).getBindValues()[i].getString();
+            String val = this.batchCommandIndex == -1 ? this.queryBindings == null ? null : this.queryBindings.getBindValues()[i].getString() : batchArg.getBindValues()[i].getString();
             buf.append(val == null ? "** NOT SPECIFIED **" : val);
         }
         buf.append(this.charEncoding != null ? StringUtils.toString(staticSqlStrings[this.parameterCount], this.charEncoding)
@@ -181,23 +164,19 @@ public class ClientPreparedQuery extends AbstractQuery implements PreparedQuery 
      *            number of batched arguments
      * @return new long[] { maxSizeOfParameterSet, sizeOfEntireBatch }
      */
-    protected long[] computeMaxParameterSetSizeAndBatchSize(int numBatchedArgs) {
+    protected long[] computeMaxParameterSetSizeAndBatchSize(int numBatchedArgs) throws CJException {
         long sizeOfEntireBatch = 1 /* com_query */;
         long maxSizeOfParameterSet = 0;
 
         if (this.session.getServerSession().supportsQueryAttributes()) {
             sizeOfEntireBatch += 9 /* parameter_count */ + 1 /* parameter_set_count */;
-            sizeOfEntireBatch += (this.queryAttributesBindings.getCount() + 7) / 8 /* null_bitmap */ + 1 /* new_params_bind_flag */;
-            for (int i = 0; i < this.queryAttributesBindings.getCount(); i++) {
-                BindValue queryAttribute = this.queryAttributesBindings.getAttributeValue(i);
-                sizeOfEntireBatch += 2 /* parameter_type */ + queryAttribute.getName().length() /* parameter_name */ + queryAttribute.getBinaryLength();
-            }
+            sizeOfEntireBatch += /* null_bitmap */ 1 /* new_params_bind_flag */;
         }
 
         for (int i = 0; i < numBatchedArgs; i++) {
             long sizeOfParameterSet = 0;
 
-            BindValue[] bindValues = ((QueryBindings) this.batchedArgs.get(i)).getBindValues();
+            BindValue[] bindValues = this.batchedArgs.get(i).getBindValues();
             for (int j = 0; j < bindValues.length; j++) {
                 sizeOfParameterSet += bindValues[j].getTextLength();
             }
@@ -220,7 +199,7 @@ public class ClientPreparedQuery extends AbstractQuery implements PreparedQuery 
 
     @SuppressWarnings("unchecked")
     @Override
-    public <M extends Message> M fillSendPacket(QueryBindings bindings) {
+    public <M extends Message> M fillSendPacket(QueryBindings bindings) throws CJException {
         return (M) this.session.getProtocol().getMessageBuilder().buildComQuery(this.session.getSharedSendPacket(), this.session, this, bindings,
                 this.charEncoding);
     }

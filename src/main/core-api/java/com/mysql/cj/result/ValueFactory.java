@@ -24,6 +24,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import com.mysql.cj.conf.PropertySet;
+import com.mysql.cj.exceptions.DataConversionException;
+import com.mysql.cj.exceptions.DataReadException;
+import com.mysql.cj.exceptions.NumberOutOfRange;
 import com.mysql.cj.protocol.InternalDate;
 import com.mysql.cj.protocol.InternalTime;
 import com.mysql.cj.protocol.InternalTimestamp;
@@ -41,27 +44,27 @@ public interface ValueFactory<T> {
 
     void setPropertySet(PropertySet pset);
 
-    T createFromDate(InternalDate idate);
+    T createFromDate(InternalDate idate) throws DataReadException;
 
-    T createFromTime(InternalTime it);
+    T createFromTime(InternalTime it) throws DataReadException;
 
-    T createFromTimestamp(InternalTimestamp its);
+    T createFromTimestamp(InternalTimestamp its) throws DataReadException;
 
-    T createFromDatetime(InternalTimestamp its);
+    T createFromDatetime(InternalTimestamp its) throws DataReadException;
 
-    T createFromLong(long l);
+    T createFromLong(long l) throws NumberOutOfRange, DataConversionException;
 
-    T createFromBigInteger(BigInteger i);
+    T createFromBigInteger(BigInteger i) throws NumberOutOfRange, DataConversionException;
 
-    T createFromDouble(double d);
+    T createFromDouble(double d) throws NumberOutOfRange, DataConversionException;
 
-    T createFromBigDecimal(BigDecimal d);
+    T createFromBigDecimal(BigDecimal d) throws NumberOutOfRange, DataConversionException;
 
-    T createFromBytes(byte[] bytes, int offset, int length, Field f);
+    T createFromBytes(byte[] bytes, int offset, int length, Field f) throws DataReadException;
 
-    T createFromBit(byte[] bytes, int offset, int length);
+    T createFromBit(byte[] bytes, int offset, int length) throws NumberOutOfRange, DataConversionException;
 
-    T createFromYear(long l);
+    T createFromYear(long l) throws DataReadException;
 
     /**
      * Create result value from intermediate null value.

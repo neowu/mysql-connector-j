@@ -20,15 +20,12 @@
 
 package com.mysql.cj.conf;
 
-import java.util.Properties;
+import com.mysql.cj.exceptions.CJException;
 
 import javax.naming.Reference;
-
-import com.mysql.cj.exceptions.ExceptionInterceptor;
+import java.util.Properties;
 
 public class MemorySizeProperty extends IntegerProperty {
-
-    private static final long serialVersionUID = 4200558564320133284L;
 
     private String initialValueAsString;
 
@@ -40,14 +37,14 @@ public class MemorySizeProperty extends IntegerProperty {
     }
 
     @Override
-    public void initializeFrom(Properties extractFrom, ExceptionInterceptor exceptionInterceptor) {
-        super.initializeFrom(extractFrom, exceptionInterceptor);
+    public void initializeFrom(Properties extractFrom) {
+        super.initializeFrom(extractFrom);
         this.initialValueAsString = this.valueAsString;
     }
 
     @Override
-    public void initializeFrom(Reference ref, ExceptionInterceptor exceptionInterceptor) {
-        super.initializeFrom(ref, exceptionInterceptor);
+    public void initializeFrom(Reference ref) {
+        super.initializeFrom(ref);
         this.initialValueAsString = this.valueAsString;
     }
 
@@ -57,8 +54,8 @@ public class MemorySizeProperty extends IntegerProperty {
     }
 
     @Override
-    public void setValueInternal(Integer value, String valueAsString, ExceptionInterceptor exceptionInterceptor) {
-        super.setValueInternal(value, valueAsString, exceptionInterceptor);
+    public void setValueInternal(Integer value, String valueAsString) {
+        super.setValueInternal(value, valueAsString);
         this.valueAsString = valueAsString == null ? String.valueOf(value.intValue()) : valueAsString;
     }
 
@@ -66,7 +63,6 @@ public class MemorySizeProperty extends IntegerProperty {
     public void resetValue() {
         this.value = this.initialValue;
         this.valueAsString = this.initialValueAsString;
-        invokeListeners();
     }
 
 }

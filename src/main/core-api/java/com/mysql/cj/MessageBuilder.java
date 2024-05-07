@@ -20,20 +20,12 @@
 
 package com.mysql.cj;
 
-import java.util.List;
-
+import com.mysql.cj.exceptions.CJException;
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.Message;
 
 public interface MessageBuilder<M extends Message> {
+    M buildComQuery(M sharedPacket, Session sess, String query, Query callingQuery, String characterEncoding) throws WrongArgumentException;
 
-    M buildSqlStatement(String statement);
-
-    M buildSqlStatement(String statement, List<Object> args);
-
-    M buildClose();
-
-    M buildComQuery(M sharedPacket, Session sess, String query, Query callingQuery, String characterEncoding);
-
-    M buildComQuery(M sharedPacket, Session sess, PreparedQuery preparedQuery, QueryBindings bindings, String characterEncoding);
-
+    M buildComQuery(M sharedPacket, Session sess, PreparedQuery preparedQuery, QueryBindings bindings, String characterEncoding) throws CJException;
 }

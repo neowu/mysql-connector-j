@@ -20,9 +20,6 @@
 
 package com.mysql.cj.protocol.a.authentication;
 
-import java.security.DigestException;
-import java.util.List;
-
 import com.mysql.cj.Messages;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.exceptions.CJException;
@@ -37,6 +34,9 @@ import com.mysql.cj.protocol.a.NativeConstants.StringSelfDataType;
 import com.mysql.cj.protocol.a.NativePacketPayload;
 import com.mysql.cj.util.StringUtils;
 
+import java.security.DigestException;
+import java.util.List;
+
 public class CachingSha2PasswordPlugin extends Sha256PasswordPlugin {
 
     public static String PLUGIN_NAME = "caching_sha2_password";
@@ -48,7 +48,7 @@ public class CachingSha2PasswordPlugin extends Sha256PasswordPlugin {
     private AuthStage stage = AuthStage.FAST_AUTH_SEND_SCRAMBLE;
 
     @Override
-    public void init(Protocol<NativePacketPayload> prot) {
+    public void init(Protocol<NativePacketPayload> prot) throws CJException {
         super.init(prot);
         this.stage = AuthStage.FAST_AUTH_SEND_SCRAMBLE;
     }
@@ -70,7 +70,7 @@ public class CachingSha2PasswordPlugin extends Sha256PasswordPlugin {
     }
 
     @Override
-    public boolean nextAuthenticationStep(NativePacketPayload fromServer, List<NativePacketPayload> toServer) {
+    public boolean nextAuthenticationStep(NativePacketPayload fromServer, List<NativePacketPayload> toServer) throws CJException {
         toServer.clear();
 
         if (this.password == null || this.password.length() == 0 || fromServer == null) {
@@ -99,7 +99,7 @@ public class CachingSha2PasswordPlugin extends Sha256PasswordPlugin {
                             this.stage = AuthStage.FULL_AUTH;
                             break;
                         default:
-                            throw ExceptionFactory.createException("Unknown server response after fast auth.", this.protocol.getExceptionInterceptor());
+                            throw ExceptionFactory.createException("Unknown server response after fast auth.");
                     }
                 }
 
@@ -119,8 +119,7 @@ public class CachingSha2PasswordPlugin extends Sha256PasswordPlugin {
 
                 } else {
                     if (!this.protocol.getPropertySet().getBooleanProperty(PropertyKey.allowPublicKeyRetrieval).getValue()) {
-                        throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("Sha256PasswordPlugin.2"),
-                                this.protocol.getExceptionInterceptor());
+                        throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("Sha256PasswordPlugin.2"));
 
                     }
 
@@ -142,18 +141,9 @@ public class CachingSha2PasswordPlugin extends Sha256PasswordPlugin {
                     }
                 }
             } catch (CJException | DigestException e) {
-                throw ExceptionFactory.createException(e.getMessage(), e, this.protocol.getExceptionInterceptor());
+                throw ExceptionFactory.createException(e.getMessage(), e);
             }
         }
         return true;
     }
-
-    @Override
-    protected byte[] encryptPassword() {
-        if (this.protocol.versionMeetsMinimum(8, 0, 5)) {
-            return super.encryptPassword();
-        }
-        return super.encryptPassword("RSA/ECB/PKCS1Padding");
-    }
-
 }

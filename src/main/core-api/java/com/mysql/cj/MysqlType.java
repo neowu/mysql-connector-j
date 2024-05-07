@@ -623,7 +623,7 @@ public enum MysqlType implements SQLType {
         return UNKNOWN;
     }
 
-    public static MysqlType getByJdbcType(int jdbcType) {
+    public static MysqlType getByJdbcType(int jdbcType) throws FeatureNotAvailableException {
         switch (jdbcType) {
             case Types.BIGINT:
                 return BIGINT;

@@ -26,35 +26,15 @@ public interface PropertySet {
 
     void addProperty(RuntimeProperty<?> prop);
 
-    void removeProperty(String name);
-
-    void removeProperty(PropertyKey key);
-
-    <T> RuntimeProperty<T> getProperty(String name);
-
     <T> RuntimeProperty<T> getProperty(PropertyKey key);
-
-    RuntimeProperty<Boolean> getBooleanProperty(String name);
 
     RuntimeProperty<Boolean> getBooleanProperty(PropertyKey key);
 
-    RuntimeProperty<Integer> getIntegerProperty(String name);
-
     RuntimeProperty<Integer> getIntegerProperty(PropertyKey key);
-
-    RuntimeProperty<Long> getLongProperty(String name);
-
-    RuntimeProperty<Long> getLongProperty(PropertyKey key);
-
-    RuntimeProperty<Integer> getMemorySizeProperty(String name);
 
     RuntimeProperty<Integer> getMemorySizeProperty(PropertyKey key);
 
-    RuntimeProperty<String> getStringProperty(String name);
-
     RuntimeProperty<String> getStringProperty(PropertyKey key);
-
-    <T extends Enum<T>> RuntimeProperty<T> getEnumProperty(String name);
 
     <T extends Enum<T>> RuntimeProperty<T> getEnumProperty(PropertyKey key);
 
@@ -66,10 +46,6 @@ public interface PropertySet {
      *            properties
      */
     void initializeProperties(Properties props);
-
-    void postInitialization();
-
-    Properties exposeAsProperties();
 
     /**
      * Reset all properties to their initial values.

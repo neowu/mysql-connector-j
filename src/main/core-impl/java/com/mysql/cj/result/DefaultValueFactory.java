@@ -20,16 +20,17 @@
 
 package com.mysql.cj.result;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-
 import com.mysql.cj.Messages;
-import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.exceptions.DataConversionException;
+import com.mysql.cj.exceptions.DataReadException;
+import com.mysql.cj.exceptions.NumberOutOfRange;
 import com.mysql.cj.protocol.InternalDate;
 import com.mysql.cj.protocol.InternalTime;
 import com.mysql.cj.protocol.InternalTimestamp;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
 /**
  * The default value factory provides a base class that can be used for value factories that do not support creation from every type. The default value factory
@@ -39,75 +40,68 @@ import com.mysql.cj.protocol.InternalTimestamp;
  *            value type
  */
 public abstract class DefaultValueFactory<T> implements ValueFactory<T> {
-
-    protected boolean jdbcCompliantTruncationForReads = true;
-
     public DefaultValueFactory(PropertySet pset) {
         this.pset = pset;
-
-        // TODO we always check initial value here, whatever the setupServerForTruncationChecks() does for writes.
-        // It also means that runtime changes of this variable have no effect on reads.
-        this.jdbcCompliantTruncationForReads = this.pset.getBooleanProperty(PropertyKey.jdbcCompliantTruncation).getInitialValue();
     }
 
-    protected PropertySet pset = null;
+    protected PropertySet pset;
 
     @Override
     public void setPropertySet(PropertySet pset) {
         this.pset = pset;
     }
 
-    protected T unsupported(String sourceType) {
+    protected T unsupported(String sourceType) throws DataConversionException {
         throw new DataConversionException(Messages.getString("ResultSet.UnsupportedConversion", new Object[] { sourceType, getTargetTypeName() }));
     }
 
     @Override
-    public T createFromDate(InternalDate idate) {
+    public T createFromDate(InternalDate idate) throws DataReadException {
         return unsupported("DATE");
     }
 
     @Override
-    public T createFromTime(InternalTime it) {
+    public T createFromTime(InternalTime it) throws DataReadException {
         return unsupported("TIME");
     }
 
     @Override
-    public T createFromTimestamp(InternalTimestamp its) {
+    public T createFromTimestamp(InternalTimestamp its) throws DataReadException {
         return unsupported("TIMESTAMP");
     }
 
     @Override
-    public T createFromDatetime(InternalTimestamp its) {
+    public T createFromDatetime(InternalTimestamp its) throws DataReadException {
         return unsupported("DATETIME");
     }
 
     @Override
-    public T createFromLong(long l) {
+    public T createFromLong(long l) throws NumberOutOfRange, DataConversionException {
         return unsupported("LONG");
     }
 
     @Override
-    public T createFromBigInteger(BigInteger i) {
+    public T createFromBigInteger(BigInteger i) throws NumberOutOfRange, DataConversionException {
         return unsupported("BIGINT");
     }
 
     @Override
-    public T createFromDouble(double d) {
+    public T createFromDouble(double d) throws NumberOutOfRange, DataConversionException {
         return unsupported("DOUBLE");
     }
 
     @Override
-    public T createFromBigDecimal(BigDecimal d) {
+    public T createFromBigDecimal(BigDecimal d) throws NumberOutOfRange, DataConversionException {
         return unsupported("DECIMAL");
     }
 
     @Override
-    public T createFromBit(byte[] bytes, int offset, int length) {
+    public T createFromBit(byte[] bytes, int offset, int length) throws NumberOutOfRange, DataConversionException {
         return unsupported("BIT");
     }
 
     @Override
-    public T createFromYear(long l) {
+    public T createFromYear(long l) throws DataReadException {
         return unsupported("YEAR");
     }
 

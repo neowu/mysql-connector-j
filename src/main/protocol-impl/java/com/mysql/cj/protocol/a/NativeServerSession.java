@@ -20,21 +20,18 @@
 
 package com.mysql.cj.protocol.a;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TimeZone;
-
 import com.mysql.cj.CharsetSettings;
 import com.mysql.cj.ServerVersion;
-import com.mysql.cj.conf.PropertyKey;
-import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.conf.RuntimeProperty;
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.ServerCapabilities;
 import com.mysql.cj.protocol.ServerSession;
-import com.mysql.cj.protocol.ServerSessionStateController;
 import com.mysql.cj.util.TimeUtil;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TimeZone;
 
 public class NativeServerSession implements ServerSession {
 
@@ -72,32 +69,27 @@ public class NativeServerSession implements ServerSession {
     public static final int CLIENT_QUERY_ATTRIBUTES = 0x08000000;
     public static final int CLIENT_MULTI_FACTOR_AUTHENTICATION = 0x10000000;
 
-    private PropertySet propertySet;
+    private final TimeZone defaultTimeZone = TimeZone.getDefault();
+
     private NativeCapabilities capabilities;
     private int oldStatusFlags = 0;
     private int statusFlags = 0;
     private long clientParam = 0;
-    private NativeServerSessionStateController serverSessionStateController;
-
-    /** The map of server variables that we retrieve at connection init. */
+    /**
+     * The map of server variables that we retrieve at connection init.
+     */
     private Map<String, String> serverVariables = new HashMap<>();
-
     private CharsetSettings charsetSettings;
-
-    /** Are we in autoCommit mode? */
+    /**
+     * Are we in autoCommit mode?
+     */
     private boolean autoCommit = true;
-
-    /** The timezone of the server */
+    /**
+     * The timezone of the server
+     */
     private TimeZone sessionTimeZone = null;
 
-    private TimeZone defaultTimeZone = TimeZone.getDefault();
-
-    private RuntimeProperty<Boolean> cacheDefaultTimeZone = null;
-
-    public NativeServerSession(PropertySet propertySet) {
-        this.propertySet = propertySet;
-        this.cacheDefaultTimeZone = this.propertySet.getBooleanProperty(PropertyKey.cacheDefaultTimeZone);
-        this.serverSessionStateController = new NativeServerSessionStateController();
+    public NativeServerSession() {
     }
 
     @Override
@@ -205,11 +197,6 @@ public class NativeServerSession implements ServerSession {
     }
 
     @Override
-    public boolean isSessionStateTrackingEnabled() {
-        return (this.clientParam & CLIENT_SESSION_TRACK) != 0;
-    }
-
-    @Override
     public boolean isEOFDeprecated() {
         return (this.clientParam & CLIENT_DEPRECATE_EOF) != 0;
     }
@@ -244,7 +231,6 @@ public class NativeServerSession implements ServerSession {
     public void setServerVariables(Map<String, String> serverVariables) {
         this.serverVariables = serverVariables;
     }
-
     @Override
     public final ServerVersion getServerVersion() {
         return this.capabilities.getServerVersion();
@@ -310,20 +296,20 @@ public class NativeServerSession implements ServerSession {
      */
     @Override
     public boolean isNoBackslashEscapesSet() {
-        String sqlModeAsString = this.serverVariables.get("sql_mode");
-        return sqlModeAsString != null && sqlModeAsString.indexOf("NO_BACKSLASH_ESCAPES") != -1;
+        // refer to com.mysql.cj.NativeSession.loadServerVariables, line 238
+        return false;
     }
 
     @Override
     public boolean useAnsiQuotedIdentifiers() {
-        String sqlModeAsString = this.serverVariables.get("sql_mode");
-        return sqlModeAsString != null && sqlModeAsString.indexOf("ANSI_QUOTES") != -1;
+        // refer to com.mysql.cj.NativeSession.loadServerVariables, line 238
+        return false;
     }
 
     @Override
     public boolean isServerTruncatesFracSecs() {
-        String sqlModeAsString = this.serverVariables.get("sql_mode");
-        return sqlModeAsString != null && sqlModeAsString.indexOf("TIME_TRUNCATE_FRACTIONAL") != -1;
+        // refer to com.mysql.cj.NativeSession.loadServerVariables, line 238
+        return false;
     }
 
     @Override
@@ -337,7 +323,7 @@ public class NativeServerSession implements ServerSession {
     }
 
     @Override
-    public TimeZone getSessionTimeZone() {
+    public TimeZone getSessionTimeZone() throws CJException {
         if (this.sessionTimeZone == null) {
             String configuredTimeZoneOnServer = getServerVariable("time_zone");
             if ("SYSTEM".equalsIgnoreCase(configuredTimeZoneOnServer)) {
@@ -345,7 +331,7 @@ public class NativeServerSession implements ServerSession {
             }
             if (configuredTimeZoneOnServer != null) {
                 try {
-                    this.sessionTimeZone = TimeZone.getTimeZone(TimeUtil.getCanonicalTimeZone(configuredTimeZoneOnServer, null));
+                    this.sessionTimeZone = TimeZone.getTimeZone(TimeUtil.getCanonicalTimeZone(configuredTimeZoneOnServer));
                 } catch (IllegalArgumentException iae) {
                     throw ExceptionFactory.createException(WrongArgumentException.class, iae.getMessage());
                 }
@@ -362,15 +348,7 @@ public class NativeServerSession implements ServerSession {
 
     @Override
     public TimeZone getDefaultTimeZone() {
-        if (this.cacheDefaultTimeZone.getValue()) {
-            return this.defaultTimeZone;
-        }
-        return TimeZone.getDefault();
-    }
-
-    @Override
-    public ServerSessionStateController getServerSessionStateController() {
-        return this.serverSessionStateController;
+        return this.defaultTimeZone;
     }
 
     @Override

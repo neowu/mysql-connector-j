@@ -20,15 +20,15 @@
 
 package com.mysql.cj;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.util.SearchMode;
 import com.mysql.cj.util.StringInspector;
 import com.mysql.cj.util.StringUtils;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
 /**
  * Represents the "parsed" state of a prepared query, with the statement broken up into its static and dynamic (where parameters are bound) parts.
@@ -77,9 +77,9 @@ public class QueryInfo {
      * @param encoding
      *            the characters encoding to use when extracting the query static parts as byte arrays.
      */
-    public QueryInfo(String sql, Session session, String encoding) {
+    public QueryInfo(String sql, Session session, String encoding) throws WrongArgumentException {
         if (sql == null) {
-            throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("QueryInfo.NullSql"), session.getExceptionInterceptor());
+            throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("QueryInfo.NullSql"));
         }
 
         this.baseQueryInfo = this;
@@ -87,15 +87,13 @@ public class QueryInfo {
         this.sql = sql;
         this.encoding = encoding;
 
-        boolean noBackslashEscapes = session.getServerSession().isNoBackslashEscapesSet();
         boolean rewriteBatchedStatements = session.getPropertySet().getBooleanProperty(PropertyKey.rewriteBatchedStatements).getValue();
         boolean dontCheckOnDuplicateKeyUpdateInSQL = session.getPropertySet().getBooleanProperty(PropertyKey.dontCheckOnDuplicateKeyUpdateInSQL).getValue();
 
-        this.queryReturnType = getQueryReturnType(this.sql, noBackslashEscapes);
+        this.queryReturnType = getQueryReturnType(this.sql, false);
         this.queryLength = this.sql.length();
 
-        StringInspector strInspector = new StringInspector(this.sql, OPENING_MARKERS, CLOSING_MARKERS, OVERRIDING_MARKERS,
-                noBackslashEscapes ? SearchMode.__MRK_COM_MYM_HNT_WS : SearchMode.__BSE_MRK_COM_MYM_HNT_WS);
+        StringInspector strInspector = new StringInspector(this.sql, OPENING_MARKERS, CLOSING_MARKERS, OVERRIDING_MARKERS, SearchMode.__BSE_MRK_COM_MYM_HNT_WS);
 
         // Skip comments at the beginning of queries.
         this.queryStartPos = strInspector.indexOfNextAlphanumericChar();
@@ -329,7 +327,7 @@ public class QueryInfo {
                 this.valuesEndpoints.add(valuesClauseEnd);
             }
 
-            if (valuesClauseBeginFound && valuesClauseEndFound) {
+            if (valuesClauseBeginFound) {
                 this.valuesClauseLength = valuesClauseEnd - valuesClauseBegin;
             } else {
                 rewritableAsMultiValues = false;
@@ -361,7 +359,7 @@ public class QueryInfo {
      * @param batchCount
      *            the number of batches, i.e., the number of times the VALUES clause needs to be repeated inside the new query
      */
-    private QueryInfo(QueryInfo baseQueryInfo, int batchCount) {
+    private QueryInfo(QueryInfo baseQueryInfo, int batchCount) throws WrongArgumentException {
         this.baseQueryInfo = baseQueryInfo;
 
         this.sql = null;
@@ -530,7 +528,7 @@ public class QueryInfo {
      *            the number of parameter batches
      * @return {@link QueryInfo}
      */
-    public QueryInfo getQueryInfoForBatch(int count) {
+    public QueryInfo getQueryInfoForBatch(int count) throws WrongArgumentException {
         if (count == 1) {
             return this.baseQueryInfo;
         }
@@ -551,7 +549,7 @@ public class QueryInfo {
      * @return
      *         a preparable query string with the appropriate number of placeholders
      */
-    public String getSqlForBatch() {
+    public String getSqlForBatch() throws WrongArgumentException {
         if (this.batchCount == 1) {
             return this.baseQueryInfo.sql;
         }
@@ -572,7 +570,7 @@ public class QueryInfo {
      *            number of parameter batches
      * @return a preparable query string with the appropriate number of placeholders
      */
-    public String getSqlForBatch(int count) {
+    public String getSqlForBatch(int count) throws WrongArgumentException {
         QueryInfo batchInfo = getQueryInfoForBatch(count);
         return batchInfo.getSqlForBatch();
     }

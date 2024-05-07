@@ -26,6 +26,7 @@ import java.util.Optional;
 import com.mysql.cj.Messages;
 import com.mysql.cj.conf.RuntimeProperty;
 import com.mysql.cj.exceptions.CJPacketTooBigException;
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.MessageReader;
 import com.mysql.cj.protocol.SocketConnection;
 
@@ -49,7 +50,7 @@ public class SimplePacketReader implements MessageReader<NativePacketHeader, Nat
     }
 
     @Override
-    public NativePacketHeader readHeader() throws IOException {
+    public NativePacketHeader readHeader() throws IOException, CJPacketTooBigException {
         if (this.lastHeader == null) {
             return readHeaderLocal();
         }
@@ -60,12 +61,12 @@ public class SimplePacketReader implements MessageReader<NativePacketHeader, Nat
     }
 
     @Override
-    public NativePacketHeader probeHeader() throws IOException {
+    public NativePacketHeader probeHeader() throws IOException, CJPacketTooBigException {
         this.lastHeader = readHeaderLocal();
         return this.lastHeader;
     }
 
-    private NativePacketHeader readHeaderLocal() throws IOException {
+    private NativePacketHeader readHeaderLocal() throws IOException, CJPacketTooBigException {
         NativePacketHeader hdr = new NativePacketHeader();
 
         try {
@@ -88,7 +89,7 @@ public class SimplePacketReader implements MessageReader<NativePacketHeader, Nat
     }
 
     @Override
-    public NativePacketPayload readMessage(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException {
+    public NativePacketPayload readMessage(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException, WrongArgumentException {
         if (this.lastMessage == null) {
             return readMessageLocal(reuse, header);
         }
@@ -98,12 +99,12 @@ public class SimplePacketReader implements MessageReader<NativePacketHeader, Nat
     }
 
     @Override
-    public NativePacketPayload probeMessage(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException {
+    public NativePacketPayload probeMessage(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException, WrongArgumentException {
         this.lastMessage = readMessageLocal(reuse, header);
         return this.lastMessage;
     }
 
-    private NativePacketPayload readMessageLocal(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException {
+    private NativePacketPayload readMessageLocal(Optional<NativePacketPayload> reuse, NativePacketHeader header) throws IOException, WrongArgumentException {
         try {
             int packetLength = header.getMessageSize();
             NativePacketPayload message;

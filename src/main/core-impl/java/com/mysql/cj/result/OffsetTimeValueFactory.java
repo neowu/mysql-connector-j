@@ -62,7 +62,7 @@ public class OffsetTimeValueFactory extends AbstractDateTimeValueFactory<OffsetT
     }
 
     @Override
-    public OffsetTime localCreateFromTime(InternalTime it) {
+    public OffsetTime localCreateFromTime(InternalTime it) throws DataReadException {
         if (it.getHours() < 0 || it.getHours() >= 24) {
             throw new DataReadException(Messages.getString("ResultSet.InvalidTimeValue", new Object[] { it.toString() }));
         }
@@ -70,7 +70,7 @@ public class OffsetTimeValueFactory extends AbstractDateTimeValueFactory<OffsetT
     }
 
     @Override
-    public OffsetTime localCreateFromTimestamp(InternalTimestamp its) {
+    public OffsetTime localCreateFromTimestamp(InternalTimestamp its) throws DataReadException {
         if (this.warningListener != null) {
             this.warningListener.warningEncountered(Messages.getString("ResultSet.PrecisionLostWarning", new Object[] { getTargetTypeName() }));
         }
@@ -79,7 +79,7 @@ public class OffsetTimeValueFactory extends AbstractDateTimeValueFactory<OffsetT
     }
 
     @Override
-    public OffsetTime localCreateFromDatetime(InternalTimestamp its) {
+    public OffsetTime localCreateFromDatetime(InternalTimestamp its) throws DataReadException {
         if (this.warningListener != null) {
             this.warningListener.warningEncountered(Messages.getString("ResultSet.PrecisionLostWarning", new Object[] { getTargetTypeName() }));
         }
@@ -88,7 +88,7 @@ public class OffsetTimeValueFactory extends AbstractDateTimeValueFactory<OffsetT
     }
 
     @Override
-    public OffsetTime createFromBytes(byte[] bytes, int offset, int length, Field f) {
+    public OffsetTime createFromBytes(byte[] bytes, int offset, int length, Field f) throws DataReadException {
         if (length == 0 && this.pset.getBooleanProperty(PropertyKey.emptyStringsConvertToZero).getValue()) {
             return createFromLong(0);
         }

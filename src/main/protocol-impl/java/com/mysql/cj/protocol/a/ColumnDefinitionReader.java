@@ -21,6 +21,7 @@
 package com.mysql.cj.protocol.a;
 
 import com.mysql.cj.MysqlType;
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.protocol.ColumnDefinition;
 import com.mysql.cj.protocol.ProtocolEntityFactory;
 import com.mysql.cj.protocol.ProtocolEntityReader;
@@ -37,7 +38,7 @@ public class ColumnDefinitionReader implements ProtocolEntityReader<ColumnDefini
     }
 
     @Override
-    public ColumnDefinition read(ProtocolEntityFactory<ColumnDefinition, NativePacketPayload> sf) {
+    public ColumnDefinition read(ProtocolEntityFactory<ColumnDefinition, NativePacketPayload> sf) throws CJException {
         ColumnDefinitionFactory cdf = (ColumnDefinitionFactory) sf;
 
         long columnCount = cdf.getColumnCount();

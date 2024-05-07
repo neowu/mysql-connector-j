@@ -20,36 +20,36 @@
 
 package com.mysql.cj.protocol.a;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
+import com.mysql.cj.exceptions.CJCommunicationsException;
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
 import com.mysql.cj.exceptions.FeatureNotAvailableException;
 import com.mysql.cj.exceptions.SSLParamsException;
-import com.mysql.cj.log.Log;
 import com.mysql.cj.protocol.AbstractSocketConnection;
 import com.mysql.cj.protocol.FullReadInputStream;
 import com.mysql.cj.protocol.PacketSentTimeHolder;
 import com.mysql.cj.protocol.ReadAheadInputStream;
 import com.mysql.cj.protocol.ServerSession;
 import com.mysql.cj.protocol.SocketConnection;
+import com.mysql.cj.protocol.StandardSocketFactory;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 public class NativeSocketConnection extends AbstractSocketConnection implements SocketConnection {
 
     @Override
-    public void connect(String hostName, int portNumber, PropertySet propSet, ExceptionInterceptor excInterceptor, Log log, int loginTimeout) {
+    public void connect(String hostName, int portNumber, PropertySet propSet, int loginTimeout) throws CJException {
         try {
             this.port = portNumber;
             this.host = hostName;
             this.propertySet = propSet;
-            this.exceptionInterceptor = excInterceptor;
 
-            this.socketFactory = createSocketFactory(propSet.getStringProperty(PropertyKey.socketFactory).getStringValue());
+            this.socketFactory = new StandardSocketFactory();
             this.mysqlSocket = this.socketFactory.connect(this.host, this.port, propSet, loginTimeout);
 
             int socketTimeout = propSet.getIntegerProperty(PropertyKey.socketTimeout).getValue();
@@ -65,8 +65,7 @@ public class NativeSocketConnection extends AbstractSocketConnection implements 
 
             InputStream rawInputStream;
             if (propSet.getBooleanProperty(PropertyKey.useReadAheadInput).getValue()) {
-                rawInputStream = new ReadAheadInputStream(this.mysqlSocket.getInputStream(), 16384,
-                        propSet.getBooleanProperty(PropertyKey.traceProtocol).getValue(), log);
+                rawInputStream = new ReadAheadInputStream(this.mysqlSocket.getInputStream(), 16384);
             } else if (propSet.getBooleanProperty(PropertyKey.useUnbufferedInput).getValue()) {
                 rawInputStream = this.mysqlSocket.getInputStream();
             } else {
@@ -77,18 +76,13 @@ public class NativeSocketConnection extends AbstractSocketConnection implements 
             this.mysqlOutput = new BufferedOutputStream(this.mysqlSocket.getOutputStream(), 16384);
         } catch (IOException ioEx) {
             throw ExceptionFactory.createCommunicationsException(propSet, null, new PacketSentTimeHolder() {
-            }, null, ioEx, getExceptionInterceptor());
+            }, null, ioEx);
         }
     }
 
     @Override
-    public void performTlsHandshake(ServerSession serverSession) throws SSLParamsException, FeatureNotAvailableException, IOException {
-        performTlsHandshake(serverSession, null);
-    }
-
-    @Override
-    public void performTlsHandshake(ServerSession serverSession, Log log) throws SSLParamsException, FeatureNotAvailableException, IOException {
-        this.mysqlSocket = this.socketFactory.performTlsHandshake(this, serverSession, log);
+    public void performTlsHandshake(ServerSession serverSession) throws SSLParamsException, FeatureNotAvailableException, IOException, CJCommunicationsException {
+        this.mysqlSocket = this.socketFactory.performTlsHandshake(this, serverSession);
 
         this.mysqlInput = new FullReadInputStream(
                 this.propertySet.getBooleanProperty(PropertyKey.useUnbufferedInput).getValue() ? getMysqlSocket().getInputStream()

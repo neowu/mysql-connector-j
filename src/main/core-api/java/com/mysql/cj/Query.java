@@ -20,84 +20,41 @@
 
 package com.mysql.cj;
 
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.protocol.Message;
 import com.mysql.cj.protocol.ProtocolEntityFactory;
 import com.mysql.cj.protocol.Resultset;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
+
 public interface Query {
 
-    public enum CancelStatus {
+    enum CancelStatus {
         NOT_CANCELED, CANCELED_BY_USER, CANCELED_BY_TIMEOUT;
     }
 
-    /**
-     * Returns the query id used when profiling
-     *
-     * @return id
-     */
-    int getId();
-
     void setCancelStatus(CancelStatus cs);
 
-    void checkCancelTimeout();
+    void checkCancelTimeout() throws CJException;
 
     <T extends Resultset, M extends Message> ProtocolEntityFactory<T, M> getResultSetFactory();
 
     Session getSession();
 
-    Object getCancelTimeoutMutex();
+    ReentrantLock getCancelTimeoutMutex();
 
     void resetCancelledState();
 
     void closeQuery();
 
-    void addBatch(Object batch);
-
-    /**
-     * Get the batched args as added by the addBatch method(s).
-     * The list is unmodifiable and might contain any combination of String,
-     * ClientPreparedQueryBindings, or ServerPreparedQueryBindings depending on how the parameters were
-     * batched.
-     *
-     * @return an unmodifiable List of batched args
-     */
-    List<Object> getBatchedArgs();
-
-    void clearBatchedArgs();
-
-    QueryAttributesBindings getQueryAttributesBindings();
-
-    int getResultFetchSize();
-
-    void setResultFetchSize(int fetchSize);
-
-    Resultset.Type getResultType();
-
-    void setResultType(Resultset.Type resultSetType);
-
     long getTimeoutInMillis();
 
     void setTimeoutInMillis(long timeoutInMillis);
 
-    void setExecuteTime(long executeTime);
-
-    /**
-     * Returns the elapsed time for the server to execute the query.
-     *
-     * @return the time it took for the server to execute the query.
-     */
-    long getExecuteTime();
-
     CancelQueryTask startQueryTimer(Query stmtToCancel, long timeout);
 
     AtomicBoolean getStatementExecuting();
-
-    String getCurrentDatabase();
-
-    void setCurrentDatabase(String currentDb);
 
     boolean isClearWarningsCalled();
 
@@ -105,6 +62,6 @@ public interface Query {
 
     void statementBegins();
 
-    void stopQueryTimer(CancelQueryTask timeoutTask, boolean rethrowCancelReason, boolean checkCancelTimeout);
+    void stopQueryTimer(CancelQueryTask timeoutTask, boolean rethrowCancelReason, boolean checkCancelTimeout) throws CJException;
 
 }

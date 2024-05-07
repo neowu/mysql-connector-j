@@ -20,7 +20,8 @@
 
 package com.mysql.cj.protocol.a.result;
 
-import com.mysql.cj.exceptions.ExceptionInterceptor;
+import com.mysql.cj.exceptions.DataReadException;
+import com.mysql.cj.jdbc.exceptions.SQLExceptionsMapping;
 import com.mysql.cj.protocol.ColumnDefinition;
 import com.mysql.cj.protocol.ValueDecoder;
 import com.mysql.cj.protocol.a.NativeConstants.IntegerDataType;
@@ -28,6 +29,8 @@ import com.mysql.cj.protocol.a.NativeConstants.StringSelfDataType;
 import com.mysql.cj.protocol.a.NativePacketPayload;
 import com.mysql.cj.result.Row;
 import com.mysql.cj.result.ValueFactory;
+
+import java.sql.SQLException;
 
 /**
  * A ResultSetRow implementation that holds one row packet (which is re-used by the driver, and thus saves memory allocations), and tries when possible to avoid
@@ -37,8 +40,8 @@ import com.mysql.cj.result.ValueFactory;
  */
 public class TextBufferRow extends AbstractBufferRow {
 
-    public TextBufferRow(NativePacketPayload buf, ColumnDefinition cd, ExceptionInterceptor exceptionInterceptor, ValueDecoder valueDecoder) {
-        super(exceptionInterceptor);
+    public TextBufferRow(NativePacketPayload buf, ColumnDefinition cd, ValueDecoder valueDecoder) {
+        super();
 
         this.rowFromServer = buf;
         this.homePosition = this.rowFromServer.getPosition();
@@ -116,10 +119,9 @@ public class TextBufferRow extends AbstractBufferRow {
      * Implementation of getValue() based on the underlying Buffer object. Delegate to superclass for decoding.
      */
     @Override
-    public <T> T getValue(int columnIndex, ValueFactory<T> vf) {
+    public <T> T getValue(int columnIndex, ValueFactory<T> vf) throws SQLException {
         findAndSeekToOffset(columnIndex);
         int length = (int) this.rowFromServer.readInteger(IntegerDataType.INT_LENENC);
         return getValueFromBytes(columnIndex, this.rowFromServer.getByteBuffer(), this.rowFromServer.getPosition(), length, vf);
     }
-
 }

@@ -20,15 +20,13 @@
 
 package com.mysql.cj;
 
-import java.util.Calendar;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.protocol.Message;
 import com.mysql.cj.result.Field;
 
 public interface BindValue {
 
-    BindValue clone();
+    BindValue copy();
 
     void reset();
 
@@ -36,33 +34,15 @@ public interface BindValue {
 
     void setNull(boolean isNull);
 
-    boolean isStream();
-
     MysqlType getMysqlType();
 
-    void setMysqlType(MysqlType type);
-
-    byte[] getByteValue();
+    byte[] getByteValue() throws CJException;
 
     boolean isSet();
 
-    void setBinding(Object obj, MysqlType type, int numberOfExecutions, AtomicBoolean sendTypesToServer);
-
-    Calendar getCalendar();
-
-    void setCalendar(Calendar cal);
-
-    boolean escapeBytesIfNeeded();
-
-    void setEscapeBytesIfNeeded(boolean val);
+    void setBinding(Object obj, MysqlType type);
 
     Object getValue();
-
-    boolean isNational();
-
-    void setIsNational(boolean isNational);
-
-    int getFieldType();
 
     /**
      * Gets the length of this bind value in the text protocol representation.
@@ -70,60 +50,22 @@ public interface BindValue {
      * @return
      *         the expected length, in bytes, of this bind value after being encoded.
      */
-    long getTextLength();
-
-    /**
-     * Gets the length of this bind value in the binary protocol representation.
-     *
-     * @return
-     *         the expected length, in bytes, of this bind value after being encoded.
-     */
-    long getBinaryLength();
-
-    long getBoundBeforeExecutionNum();
+    long getTextLength() throws CJException;
 
     /**
      * Get a String representation of the value.
      *
      * @return value as a String
      */
-    String getString();
+    String getString() throws CJException;
 
     Field getField();
 
     void setField(Field field);
 
-    boolean keepOrigNanos();
-
-    /**
-     * Should the value keep original fractional seconds ignoring sendFractionalSeconds and sendFractionalSecondsForTime?
-     * <p>
-     * <i>If the value is a part of key for UpdatableResultSet updater, it should keep original milliseconds.</i>
-     * </p>
-     *
-     * @param value
-     *            the value to set
-     */
-    void setKeepOrigNanos(boolean value);
-
     void setScaleOrLength(long scaleOrLength);
 
     long getScaleOrLength();
 
-    /**
-     * Gets the name of this query attribute.
-     *
-     * @return
-     *         the name of this query attribute.
-     */
-    String getName();
-
-    void setName(String name);
-
-    void writeAsText(Message intoMessage);
-
-    void writeAsBinary(Message intoMessage);
-
-    void writeAsQueryAttribute(Message intoMessage);
-
+    void writeAsText(Message intoMessage) throws CJException;
 }

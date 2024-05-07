@@ -20,21 +20,12 @@
 
 package com.mysql.cj.protocol.a.authentication;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.List;
-
 import com.mysql.cj.Messages;
-import com.mysql.cj.callback.MysqlCallbackHandler;
-import com.mysql.cj.callback.UsernameCallback;
 import com.mysql.cj.conf.PropertyKey;
-import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.conf.RuntimeProperty;
 import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
+import com.mysql.cj.exceptions.RSAException;
 import com.mysql.cj.exceptions.UnableToConnectException;
 import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.AuthenticationPlugin;
@@ -47,12 +38,17 @@ import com.mysql.cj.protocol.a.NativeConstants.StringSelfDataType;
 import com.mysql.cj.protocol.a.NativePacketPayload;
 import com.mysql.cj.util.StringUtils;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.List;
+
 public class Sha256PasswordPlugin implements AuthenticationPlugin<NativePacketPayload> {
 
     public static String PLUGIN_NAME = "sha256_password";
 
     protected Protocol<NativePacketPayload> protocol = null;
-    protected MysqlCallbackHandler usernameCallbackHandler = null;
     protected String password = null;
     protected String seed = null;
     protected boolean publicKeyRequested = false;
@@ -60,14 +56,13 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin<NativePacketPa
     protected RuntimeProperty<String> serverRSAPublicKeyFile = null;
 
     @Override
-    public void init(Protocol<NativePacketPayload> prot, MysqlCallbackHandler cbh) {
+    public void init(Protocol<NativePacketPayload> prot) throws CJException {
         this.protocol = prot;
-        this.usernameCallbackHandler = cbh;
         this.serverRSAPublicKeyFile = this.protocol.getPropertySet().getStringProperty(PropertyKey.serverRSAPublicKeyFile);
 
         String pkURL = this.serverRSAPublicKeyFile.getValue();
         if (pkURL != null) {
-            this.publicKeyString = readRSAKey(pkURL, this.protocol.getPropertySet(), this.protocol.getExceptionInterceptor());
+            this.publicKeyString = readRSAKey(pkURL);
         }
     }
 
@@ -75,7 +70,6 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin<NativePacketPa
     public void destroy() {
         reset();
         this.protocol = null;
-        this.usernameCallbackHandler = null;
         this.password = null;
         this.seed = null;
         this.publicKeyRequested = false;
@@ -101,14 +95,10 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin<NativePacketPa
     @Override
     public void setAuthenticationParameters(String user, String password) {
         this.password = password;
-        if (user == null && this.usernameCallbackHandler != null) {
-            // Fall back to system login user.
-            this.usernameCallbackHandler.handle(new UsernameCallback(System.getProperty("user.name")));
-        }
     }
 
     @Override
-    public boolean nextAuthenticationStep(NativePacketPayload fromServer, List<NativePacketPayload> toServer) {
+    public boolean nextAuthenticationStep(NativePacketPayload fromServer, List<NativePacketPayload> toServer) throws CJException {
         toServer.clear();
 
         if (this.password == null || this.password.length() == 0 || fromServer == null) {
@@ -135,8 +125,7 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin<NativePacketPa
 
                 } else {
                     if (!this.protocol.getPropertySet().getBooleanProperty(PropertyKey.allowPublicKeyRetrieval).getValue()) {
-                        throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("Sha256PasswordPlugin.2"),
-                                this.protocol.getExceptionInterceptor());
+                        throw ExceptionFactory.createException(UnableToConnectException.class, Messages.getString("Sha256PasswordPlugin.2"));
 
                     }
 
@@ -159,17 +148,17 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin<NativePacketPa
                     }
                 }
             } catch (CJException e) {
-                throw ExceptionFactory.createException(e.getMessage(), e, this.protocol.getExceptionInterceptor());
+                throw ExceptionFactory.createException(e.getMessage(), e);
             }
         }
         return true;
     }
 
-    protected byte[] encryptPassword() {
+    protected byte[] encryptPassword() throws RSAException {
         return encryptPassword("RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
     }
 
-    protected byte[] encryptPassword(String transformation) {
+    protected byte[] encryptPassword(String transformation) throws RSAException {
         byte[] input = null;
         input = this.password != null
                 ? StringUtils.getBytesNullTerminated(this.password, this.protocol.getServerSession().getCharsetSettings().getPasswordCharacterEncoding())
@@ -179,7 +168,7 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin<NativePacketPa
         return ExportControlled.encryptWithRSAPublicKey(mysqlScrambleBuff, ExportControlled.decodeRSAPublicKey(this.publicKeyString), transformation);
     }
 
-    protected static String readRSAKey(String pkPath, PropertySet propertySet, ExceptionInterceptor exceptionInterceptor) {
+    protected static String readRSAKey(String pkPath) throws CJException {
         String res = null;
         byte[] fileBuf = new byte[2048];
 
@@ -199,18 +188,15 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin<NativePacketPa
             res = sb.toString();
 
         } catch (IOException ioEx) {
-
             throw ExceptionFactory.createException(WrongArgumentException.class,
-                    Messages.getString("Sha256PasswordPlugin.0",
-                            propertySet.getBooleanProperty(PropertyKey.paranoid).getValue() ? new Object[] { "" } : new Object[] { "'" + pkPath + "'" }),
-                    exceptionInterceptor);
+                    Messages.getString("Sha256PasswordPlugin.0", new Object[] { "'" + pkPath + "'" }), ioEx);
 
         } finally {
             if (fileIn != null) {
                 try {
                     fileIn.close();
                 } catch (IOException e) {
-                    throw ExceptionFactory.createException(Messages.getString("Sha256PasswordPlugin.1"), e, exceptionInterceptor);
+                    throw ExceptionFactory.createException(Messages.getString("Sha256PasswordPlugin.1"), e);
                 }
             }
         }

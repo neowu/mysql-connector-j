@@ -20,7 +20,6 @@
 
 package com.mysql.cj.conf;
 
-import com.mysql.cj.exceptions.ExceptionInterceptor;
 import com.mysql.cj.util.StringUtils;
 
 public class MemorySizePropertyDefinition extends IntegerPropertyDefinition {
@@ -38,7 +37,7 @@ public class MemorySizePropertyDefinition extends IntegerPropertyDefinition {
     }
 
     @Override
-    public Integer parseObject(String value, ExceptionInterceptor exceptionInterceptor) {
+    public Integer parseObject(String value) {
         this.multiplier = 1;
 
         if (value.endsWith("k") || value.endsWith("K") || value.endsWith("kb") || value.endsWith("Kb") || value.endsWith("kB") || value.endsWith("KB")) {
@@ -55,7 +54,7 @@ public class MemorySizePropertyDefinition extends IntegerPropertyDefinition {
             value = value.substring(0, indexOfG);
         }
 
-        return super.parseObject(value, exceptionInterceptor);
+        return super.parseObject(value);
     }
 
     /**

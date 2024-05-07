@@ -21,7 +21,6 @@
 package com.mysql.cj.conf;
 
 import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
 import com.mysql.cj.exceptions.WrongArgumentException;
 
 public class IntegerProperty extends AbstractRuntimeProperty<Integer> {
@@ -33,13 +32,12 @@ public class IntegerProperty extends AbstractRuntimeProperty<Integer> {
     }
 
     @Override
-    protected void checkRange(Integer val, String valueAsString, ExceptionInterceptor exceptionInterceptor) {
+    protected void checkRange(Integer val, String valueAsString) {
         if (val.intValue() < getPropertyDefinition().getLowerBound() || val.intValue() > getPropertyDefinition().getUpperBound()) {
-            throw ExceptionFactory.createException(WrongArgumentException.class,
+            throw new Error(
                     "The connection property '" + getPropertyDefinition().getName() + "' only accepts integer values in the range of "
                             + getPropertyDefinition().getLowerBound() + " - " + getPropertyDefinition().getUpperBound() + ", the value '"
-                            + (valueAsString == null ? val.intValue() : valueAsString) + "' exceeds this range.",
-                    exceptionInterceptor);
+                            + (valueAsString == null ? val.intValue() : valueAsString) + "' exceeds this range.");
         }
     }
 

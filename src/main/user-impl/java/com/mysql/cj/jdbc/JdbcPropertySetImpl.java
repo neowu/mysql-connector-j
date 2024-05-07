@@ -20,47 +20,20 @@
 
 package com.mysql.cj.jdbc;
 
+import com.mysql.cj.conf.DefaultPropertySet;
+import com.mysql.cj.conf.PropertyDefinition;
+import com.mysql.cj.conf.PropertyDefinitions;
+import com.mysql.cj.conf.RuntimeProperty;
+
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
-import com.mysql.cj.conf.DefaultPropertySet;
-import com.mysql.cj.conf.PropertyDefinition;
-import com.mysql.cj.conf.PropertyDefinitions;
-import com.mysql.cj.conf.PropertyKey;
-import com.mysql.cj.conf.RuntimeProperty;
-import com.mysql.cj.util.StringUtils;
-
 public class JdbcPropertySetImpl extends DefaultPropertySet implements JdbcPropertySet {
 
     private static final long serialVersionUID = -8223499903182568260L;
-
-    @Override
-    public void postInitialization() {
-        // Adjust max rows
-        if (getIntegerProperty(PropertyKey.maxRows).getValue() == 0) {
-            // adjust so that it will become MysqlDefs.MAX_ROWS in execSQL()
-            super.<Integer>getProperty(PropertyKey.maxRows).setValue(Integer.valueOf(-1), null);
-        }
-
-        //
-        // Check character encoding
-        //
-        String testEncoding = getStringProperty(PropertyKey.characterEncoding).getValue();
-
-        if (testEncoding != null) {
-            // Attempt to use the encoding, and bail out if it can't be used
-            String testString = "abc";
-            StringUtils.getBytes(testString, testEncoding);
-        }
-
-        if (getBooleanProperty(PropertyKey.useCursorFetch).getValue()) {
-            // assume server-side prepared statements are wanted because they're required for this functionality
-            super.<Boolean>getProperty(PropertyKey.useServerPrepStmts).setValue(true);
-        }
-    }
 
     @Override
     public List<DriverPropertyInfo> exposeAsDriverPropertyInfo() throws SQLException {

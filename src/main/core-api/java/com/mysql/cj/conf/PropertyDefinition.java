@@ -20,16 +20,8 @@
 
 package com.mysql.cj.conf;
 
-import com.mysql.cj.exceptions.ExceptionInterceptor;
 
 public interface PropertyDefinition<T> {
-
-    /**
-     * Does the property have fixed values based constraints.
-     *
-     * @return true if property has fixed values based constraints.
-     */
-    boolean hasValueConstraints();
 
     /**
      * Returns true if property has range-based constraints
@@ -60,13 +52,6 @@ public interface PropertyDefinition<T> {
     String getCcAlias();
 
     /**
-     * Returns true if property has a camel-case alias.
-     *
-     * @return true if property has a camel-case alias.
-     */
-    boolean hasCcAlias();
-
-    /**
      * Returns the default value.
      *
      * @return default value
@@ -88,25 +73,11 @@ public interface PropertyDefinition<T> {
     String getDescription();
 
     /**
-     * Returns the driver version where the property was introduced first. Used for documentation.
-     *
-     * @return the driver version where the property was introduced first
-     */
-    String getSinceVersion();
-
-    /**
      * Returns the property category.
      *
      * @return property category
      */
     String getCategory();
-
-    /**
-     * Returns the property order. Used as preferred property position in properties table in documentation.
-     *
-     * @return property order
-     */
-    int getOrder();
 
     /**
      * Returns the list of allowable values.
@@ -134,12 +105,10 @@ public interface PropertyDefinition<T> {
      *
      * @param value
      *            value
-     * @param exceptionInterceptor
-     *            exception interceptor
      *
      * @return the value object
      */
-    T parseObject(String value, ExceptionInterceptor exceptionInterceptor);
+    T parseObject(String value);
 
     /**
      * Creates instance of ReadableProperty or ModifiableProperty depending on isRuntimeModifiable() result.

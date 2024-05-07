@@ -28,6 +28,8 @@ import com.mysql.cj.Messages;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.exceptions.DataConversionException;
+import com.mysql.cj.exceptions.NumberOutOfRange;
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.a.MysqlTextValueDecoder;
 import com.mysql.cj.util.DataTypeUtil;
 import com.mysql.cj.util.StringUtils;
@@ -81,7 +83,7 @@ public class BooleanValueFactory extends DefaultValueFactory<Boolean> {
     }
 
     @Override
-    public Boolean createFromBytes(byte[] bytes, int offset, int length, Field f) {
+    public Boolean createFromBytes(byte[] bytes, int offset, int length, Field f) throws DataConversionException, NumberOutOfRange {
         if (length == 0 && this.pset.getBooleanProperty(PropertyKey.emptyStringsConvertToZero).getValue()) {
             return createFromLong(0);
         }

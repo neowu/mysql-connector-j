@@ -24,6 +24,7 @@ import com.mysql.cj.Messages;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.exceptions.DataConversionException;
+import com.mysql.cj.exceptions.NumberOutOfRange;
 import com.mysql.cj.protocol.a.MysqlTextValueDecoder;
 import com.mysql.cj.util.StringUtils;
 
@@ -34,7 +35,7 @@ public abstract class AbstractNumericValueFactory<T> extends DefaultValueFactory
     }
 
     @Override
-    public T createFromBytes(byte[] bytes, int offset, int length, Field f) {
+    public T createFromBytes(byte[] bytes, int offset, int length, Field f) throws NumberOutOfRange, DataConversionException {
         if (length == 0 && this.pset.getBooleanProperty(PropertyKey.emptyStringsConvertToZero).getValue()) {
             return createFromLong(0);
         }
@@ -57,7 +58,7 @@ public abstract class AbstractNumericValueFactory<T> extends DefaultValueFactory
     }
 
     @Override
-    public T createFromYear(long l) {
+    public T createFromYear(long l) throws NumberOutOfRange, DataConversionException {
         return createFromLong(l);
     }
 

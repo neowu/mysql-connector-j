@@ -66,7 +66,7 @@ public class EscapeTokenizer {
      *
      * @return if this tokenizer has more tokens available
      */
-    public synchronized boolean hasMoreTokens() {
+    public boolean hasMoreTokens() {
         return this.pos < this.sourceLength;
     }
 
@@ -75,7 +75,7 @@ public class EscapeTokenizer {
      *
      * @return the next token.
      */
-    public synchronized String nextToken() {
+    public String nextToken() {
         StringBuilder tokenBuf = new StringBuilder();
         boolean backslashEscape = false;
 

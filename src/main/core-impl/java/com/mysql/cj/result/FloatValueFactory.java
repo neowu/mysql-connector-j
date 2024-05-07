@@ -39,34 +39,30 @@ public class FloatValueFactory extends AbstractNumericValueFactory<Float> {
     }
 
     @Override
-    public Float createFromBigInteger(BigInteger i) {
-        if (this.jdbcCompliantTruncationForReads && (new BigDecimal(i).compareTo(Constants.BIG_DECIMAL_MAX_NEGATIVE_FLOAT_VALUE) < 0
-                || new BigDecimal(i).compareTo(Constants.BIG_DECIMAL_MAX_FLOAT_VALUE) > 0)) {
+    public Float createFromBigInteger(BigInteger i) throws NumberOutOfRange {
+        if ((new BigDecimal(i).compareTo(Constants.BIG_DECIMAL_MAX_NEGATIVE_FLOAT_VALUE) < 0
+             || new BigDecimal(i).compareTo(Constants.BIG_DECIMAL_MAX_FLOAT_VALUE) > 0)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { i, getTargetTypeName() }));
         }
         return (float) i.doubleValue();
     }
 
     @Override
-    public Float createFromLong(long l) {
-        if (this.jdbcCompliantTruncationForReads && (l < -Float.MAX_VALUE || l > Float.MAX_VALUE)) {
-            throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { l, getTargetTypeName() }));
-        }
+    public Float createFromLong(long l) throws NumberOutOfRange {
         return (float) l;
     }
 
     @Override
-    public Float createFromBigDecimal(BigDecimal d) {
-        if (this.jdbcCompliantTruncationForReads
-                && (d.compareTo(Constants.BIG_DECIMAL_MAX_NEGATIVE_FLOAT_VALUE) < 0 || d.compareTo(Constants.BIG_DECIMAL_MAX_FLOAT_VALUE) > 0)) {
+    public Float createFromBigDecimal(BigDecimal d) throws NumberOutOfRange {
+        if ((d.compareTo(Constants.BIG_DECIMAL_MAX_NEGATIVE_FLOAT_VALUE) < 0 || d.compareTo(Constants.BIG_DECIMAL_MAX_FLOAT_VALUE) > 0)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { d, getTargetTypeName() }));
         }
         return (float) d.doubleValue();
     }
 
     @Override
-    public Float createFromDouble(double d) {
-        if (this.jdbcCompliantTruncationForReads && (d < -Float.MAX_VALUE || d > Float.MAX_VALUE)) {
+    public Float createFromDouble(double d) throws NumberOutOfRange {
+        if ((d < -Float.MAX_VALUE || d > Float.MAX_VALUE)) {
             throw new NumberOutOfRange(Messages.getString("ResultSet.NumberOutOfRange", new Object[] { d, getTargetTypeName() }));
         }
         return (float) d;

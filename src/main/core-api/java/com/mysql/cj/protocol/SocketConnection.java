@@ -20,15 +20,15 @@
 
 package com.mysql.cj.protocol;
 
+import com.mysql.cj.conf.PropertySet;
+import com.mysql.cj.exceptions.CJCommunicationsException;
+import com.mysql.cj.exceptions.CJException;
+import com.mysql.cj.exceptions.FeatureNotAvailableException;
+import com.mysql.cj.exceptions.SSLParamsException;
+
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-
-import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.exceptions.FeatureNotAvailableException;
-import com.mysql.cj.exceptions.SSLParamsException;
-import com.mysql.cj.log.Log;
 
 /**
  * Represents physical connection with endpoint
@@ -44,34 +44,12 @@ public interface SocketConnection {
      *            the port number that the server is listening on
      * @param propertySet
      *            the PropertySet with required connection options
-     * @param exceptionInterceptor
-     *            exception interceptor
-     * @param log
-     *            logger
      * @param loginTimeout
      *            the driver login time limit in milliseconds
      */
-    void connect(String host, int port, PropertySet propertySet, ExceptionInterceptor exceptionInterceptor, Log log, int loginTimeout);
+    void connect(String host, int port, PropertySet propertySet, int loginTimeout) throws CJException;
 
-    void performTlsHandshake(ServerSession serverSession) throws SSLParamsException, FeatureNotAvailableException, IOException;
-
-    /**
-     * Start a TLS handshake
-     *
-     * @param serverSession
-     *            server session state object
-     * @param log
-     *            logger
-     * @throws SSLParamsException
-     *             in case of failure
-     * @throws FeatureNotAvailableException
-     *             in case of failure
-     * @throws IOException
-     *             in case of failure
-     */
-    default void performTlsHandshake(ServerSession serverSession, Log log) throws SSLParamsException, FeatureNotAvailableException, IOException {
-        performTlsHandshake(serverSession);
-    }
+    void performTlsHandshake(ServerSession serverSession) throws SSLParamsException, FeatureNotAvailableException, IOException, CJCommunicationsException;
 
     void forceClose();
 
@@ -90,17 +68,11 @@ public interface SocketConnection {
 
     FullReadInputStream getMysqlInput() throws IOException;
 
-    void setMysqlInput(FullReadInputStream mysqlInput);
-
     BufferedOutputStream getMysqlOutput() throws IOException;
 
     boolean isSSLEstablished();
 
     SocketFactory getSocketFactory();
-
-    void setSocketFactory(SocketFactory socketFactory);
-
-    ExceptionInterceptor getExceptionInterceptor();
 
     PropertySet getPropertySet();
 

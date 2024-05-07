@@ -25,6 +25,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 import com.mysql.cj.exceptions.AssertionFailedException;
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.util.StringUtils;
 
 /**
@@ -58,7 +59,7 @@ public class Security {
         }
     }
 
-    public static byte[] scramble411(String password, byte[] seed, String passwordEncoding) {
+    public static byte[] scramble411(String password, byte[] seed, String passwordEncoding) throws WrongArgumentException, AssertionFailedException {
         byte[] passwordBytes = passwordEncoding == null || passwordEncoding.length() == 0 ? StringUtils.getBytes(password)
                 : StringUtils.getBytes(password, passwordEncoding);
         return scramble411(passwordBytes, seed);
@@ -84,7 +85,7 @@ public class Security {
      *            seed
      * @return bytes
      */
-    public static byte[] scramble411(byte[] password, byte[] seed) {
+    public static byte[] scramble411(byte[] password, byte[] seed) throws AssertionFailedException {
         MessageDigest md;
         try {
             md = MessageDigest.getInstance("SHA-1");
@@ -128,7 +129,7 @@ public class Security {
      * @throws DigestException
      *             if an error occurs
      */
-    public static byte[] scrambleCachingSha2(byte[] password, byte[] seed) throws DigestException {
+    public static byte[] scrambleCachingSha2(byte[] password, byte[] seed) throws DigestException, AssertionFailedException {
         /*
          * Server does it in 4 steps (see sql/auth/sha2_password_common.cc Generate_scramble::scramble method):
          *

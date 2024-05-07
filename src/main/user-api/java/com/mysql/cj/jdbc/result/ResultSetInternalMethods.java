@@ -20,14 +20,11 @@
 
 package com.mysql.cj.jdbc.result;
 
-import java.math.BigInteger;
-import java.sql.SQLException;
-import java.sql.Types;
-
-import com.mysql.cj.jdbc.JdbcPreparedStatement;
-import com.mysql.cj.jdbc.JdbcStatement;
 import com.mysql.cj.protocol.Resultset;
 import com.mysql.cj.protocol.ResultsetRowsOwner;
+
+import java.math.BigInteger;
+import java.sql.SQLException;
 
 /**
  * This interface is intended to be used by implementors of statement interceptors so that implementors can create static or dynamic (via
@@ -37,66 +34,6 @@ import com.mysql.cj.protocol.ResultsetRowsOwner;
  * This interface, although public is <strong>not</strong> designed to be consumed publicly other than for the statement interceptor use case.
  */
 public interface ResultSetInternalMethods extends java.sql.ResultSet, ResultsetRowsOwner, Resultset {
-
-    /**
-     * Functions like ResultSet.getObject(), but using the given SQL type
-     * (as registered during CallableStatement.registerOutParameter()).
-     *
-     * @param columnIndex
-     *            1-based column index
-     * @param desiredSqlType
-     *            desired column type, one of {@link Types}
-     * @return object
-     * @throws SQLException
-     *             if an error occurs
-     */
-    Object getObjectStoredProc(int columnIndex, int desiredSqlType) throws SQLException;
-
-    /**
-     * Functions like ResultSet.getObject(), but using the given SQL type
-     * (as registered during CallableStatement.registerOutParameter()).
-     *
-     * @param i
-     *            1-based column index
-     * @param map
-     *            map
-     * @param desiredSqlType
-     *            desired column type, one of {@link Types}
-     * @return object
-     * @throws SQLException
-     *             if an error occurs
-     */
-    Object getObjectStoredProc(int i, java.util.Map<Object, Object> map, int desiredSqlType) throws SQLException;
-
-    /**
-     * Functions like ResultSet.getObject(), but using the given SQL type
-     * (as registered during CallableStatement.registerOutParameter()).
-     *
-     * @param columnName
-     *            column name
-     * @param desiredSqlType
-     *            desired column type, one of {@link Types}
-     * @return object
-     * @throws SQLException
-     *             if an error occurs
-     */
-    Object getObjectStoredProc(String columnName, int desiredSqlType) throws SQLException;
-
-    /**
-     * Functions like ResultSet.getObject(), but using the given SQL type
-     * (as registered during CallableStatement.registerOutParameter()).
-     *
-     * @param colName
-     *            column name
-     * @param map
-     *            map
-     * @param desiredSqlType
-     *            desired column type, one of {@link Types}
-     * @return object
-     * @throws SQLException
-     *             if an error occurs
-     */
-    Object getObjectStoredProc(String colName, java.util.Map<Object, Object> map, int desiredSqlType) throws SQLException;
 
     /**
      * Closes this ResultSet and releases resources.
@@ -119,16 +56,6 @@ public interface ResultSetInternalMethods extends java.sql.ResultSet, ResultsetR
     void setFirstCharOfQuery(char firstCharUpperCase);
 
     /**
-     * Sets the statement that "owns" this result set (usually used when the
-     * result set should internally "belong" to one statement, but is created
-     * by another.
-     *
-     * @param owningStatement
-     *            the statement this result set will belong to
-     */
-    void setOwningStatement(JdbcStatement owningStatement);
-
-    /**
      * Returns the first character of the query that was issued to create this
      * result set, upper-cased.
      *
@@ -136,17 +63,7 @@ public interface ResultSetInternalMethods extends java.sql.ResultSet, ResultsetR
      */
     char getFirstCharOfQuery();
 
-    void setStatementUsedForFetchingRows(JdbcPreparedStatement stmt);
-
-    /**
-     * @param wrapperStatement
-     *            The wrapperStatement to set.
-     */
-    void setWrapperStatement(java.sql.Statement wrapperStatement);
-
     void initializeWithMetadata() throws SQLException;
-
-    void populateCachedMetaData(CachedResultSetMetaData cachedMetaData) throws SQLException;
 
     BigInteger getBigInteger(int columnIndex) throws SQLException;
 

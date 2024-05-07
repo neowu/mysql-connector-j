@@ -20,12 +20,10 @@
 
 package com.mysql.cj.conf;
 
-import java.util.Arrays;
-
 import com.mysql.cj.Messages;
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
 import com.mysql.cj.util.StringUtils;
+
+import java.util.Arrays;
 
 public class BooleanPropertyDefinition extends AbstractPropertyDefinition<Boolean> {
 
@@ -49,7 +47,7 @@ public class BooleanPropertyDefinition extends AbstractPropertyDefinition<Boolea
 
     public BooleanPropertyDefinition(PropertyKey key, Boolean defaultValue, boolean isRuntimeModifiable, String description, String sinceVersion,
             String category, int orderInCategory) {
-        super(key, defaultValue, isRuntimeModifiable, description, sinceVersion, category, orderInCategory);
+        super(key, defaultValue, isRuntimeModifiable, description, category);
     }
 
     @Override
@@ -58,8 +56,8 @@ public class BooleanPropertyDefinition extends AbstractPropertyDefinition<Boolea
     }
 
     @Override
-    public Boolean parseObject(String value, ExceptionInterceptor exceptionInterceptor) {
-        return booleanFrom(getName(), value, exceptionInterceptor);
+    public Boolean parseObject(String value) {
+        return booleanFrom(getName(), value);
     }
 
     /**
@@ -72,14 +70,14 @@ public class BooleanPropertyDefinition extends AbstractPropertyDefinition<Boolea
         return new BooleanProperty(this);
     }
 
-    public static Boolean booleanFrom(String name, String value, ExceptionInterceptor exceptionInterceptor) {
+    public static Boolean booleanFrom(String name, String value) {
         try {
             return AllowableValues.valueOf(value.toUpperCase()).asBoolean();
         } catch (Exception e) {
-            throw ExceptionFactory.createException(
+            throw new Error(
                     Messages.getString("PropertyDefinition.1",
                             new Object[] { name, StringUtils.stringArrayToString(getBooleanAllowableValues(), "'", "', '", "' or '", "'"), value }),
-                    e, exceptionInterceptor);
+                    e);
         }
     }
 

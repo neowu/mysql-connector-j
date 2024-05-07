@@ -20,69 +20,37 @@
 
 package com.mysql.cj.jdbc.result;
 
-import java.sql.SQLException;
-
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.jdbc.JdbcConnection;
 import com.mysql.cj.jdbc.StatementImpl;
 import com.mysql.cj.protocol.ProtocolEntity;
 import com.mysql.cj.protocol.ProtocolEntityFactory;
-import com.mysql.cj.protocol.Resultset;
-import com.mysql.cj.protocol.Resultset.Concurrency;
-import com.mysql.cj.protocol.Resultset.Type;
 import com.mysql.cj.protocol.ResultsetRows;
 import com.mysql.cj.protocol.a.NativePacketPayload;
 import com.mysql.cj.protocol.a.result.OkPacket;
+
+import java.sql.SQLException;
 
 public class ResultSetFactory implements ProtocolEntityFactory<ResultSetImpl, NativePacketPayload> {
 
     private JdbcConnection conn;
     private StatementImpl stmt;
 
-    private Type type = Type.FORWARD_ONLY;
-    private Concurrency concurrency = Concurrency.READ_ONLY;
-
-    public ResultSetFactory(JdbcConnection connection, StatementImpl creatorStmt) throws SQLException {
+    public ResultSetFactory(JdbcConnection connection, StatementImpl creatorStmt) {
         this.conn = connection;
         this.stmt = creatorStmt;
-
-        if (creatorStmt != null) {
-            this.type = Type.fromValue(creatorStmt.getResultSetType(), Type.FORWARD_ONLY);
-            this.concurrency = Concurrency.fromValue(creatorStmt.getResultSetConcurrency(), Concurrency.READ_ONLY);
-        }
     }
 
     @Override
-    public Resultset.Type getResultSetType() {
-        return this.type;
-    }
-
-    @Override
-    public Resultset.Concurrency getResultSetConcurrency() {
-        return this.concurrency;
-    }
-
-    @Override
-    public int getFetchSize() {
-        try {
-            return this.stmt.getFetchSize();
-        } catch (SQLException ex) {
-            throw ExceptionFactory.createException(ex.getMessage(), ex);
-        }
-    }
-
-    @Override
-    public ResultSetImpl createFromProtocolEntity(ProtocolEntity protocolEntity) {
+    public ResultSetImpl createFromProtocolEntity(ProtocolEntity protocolEntity) throws CJException {
         try {
             if (protocolEntity instanceof OkPacket) {
                 return new ResultSetImpl((OkPacket) protocolEntity, this.conn, this.stmt);
 
             } else if (protocolEntity instanceof ResultsetRows) {
-                int resultSetConcurrency = getResultSetConcurrency().getIntValue();
-                int resultSetType = getResultSetType().getIntValue();
-
-                return createFromResultsetRows(resultSetConcurrency, resultSetType, (ResultsetRows) protocolEntity);
+                return createFromResultsetRows((ResultsetRows) protocolEntity);
 
             }
             throw ExceptionFactory.createException(WrongArgumentException.class, "Unknown ProtocolEntity class " + protocolEntity);
@@ -95,17 +63,13 @@ public class ResultSetFactory implements ProtocolEntityFactory<ResultSetImpl, Na
     /**
      * Build ResultSet from ResultsetRows
      *
-     * @param resultSetType
-     *            scrollability (TYPE_FORWARD_ONLY, TYPE_SCROLL_????)
-     * @param resultSetConcurrency
-     *            the type of result set (CONCUR_UPDATABLE or READ_ONLY)
      * @param rows
      *            {@link ResultsetRows}
      * @return ResultSetImpl
      * @throws SQLException
      *             if an error occurs
      */
-    public ResultSetImpl createFromResultsetRows(int resultSetConcurrency, int resultSetType, ResultsetRows rows) throws SQLException {
+    public ResultSetImpl createFromResultsetRows(ResultsetRows rows) throws SQLException {
         ResultSetImpl rs;
 
         StatementImpl st = this.stmt;
@@ -114,25 +78,8 @@ public class ResultSetFactory implements ProtocolEntityFactory<ResultSetImpl, Na
             st = ((ResultSetImpl) rows.getOwner()).getOwningStatement();
         }
 
-        switch (resultSetConcurrency) {
-            case java.sql.ResultSet.CONCUR_UPDATABLE:
-                rs = new UpdatableResultSet(rows, this.conn, st);
-                break;
-
-            default:
-                // CONCUR_READ_ONLY
-                rs = new ResultSetImpl(rows, this.conn, st);
-                break;
-        }
-
-        rs.setResultSetType(resultSetType);
-        rs.setResultSetConcurrency(resultSetConcurrency);
-
-        if (st != null) {
-            rs.setFetchSize(st.getFetchSize());
-        }
+        rs = new ResultSetImpl(rows, this.conn, st);
 
         return rs;
     }
-
 }

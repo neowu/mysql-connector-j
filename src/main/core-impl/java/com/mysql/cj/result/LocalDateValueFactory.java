@@ -47,7 +47,7 @@ public class LocalDateValueFactory extends AbstractDateTimeValueFactory<LocalDat
     }
 
     @Override
-    public LocalDate localCreateFromDate(InternalDate idate) {
+    public LocalDate localCreateFromDate(InternalDate idate) throws DataReadException {
         if (idate.getYear() == 0 && idate.getMonth() == 0 && idate.getDay() == 0) {
             throw new DataReadException(Messages.getString("ResultSet.InvalidZeroDate"));
         }
@@ -55,7 +55,7 @@ public class LocalDateValueFactory extends AbstractDateTimeValueFactory<LocalDat
     }
 
     @Override
-    public LocalDate localCreateFromTimestamp(InternalTimestamp its) {
+    public LocalDate localCreateFromTimestamp(InternalTimestamp its) throws DataReadException {
         if (this.warningListener != null) {
             this.warningListener.warningEncountered(Messages.getString("ResultSet.PrecisionLostWarning", new Object[] { getTargetTypeName() }));
         }
@@ -64,7 +64,7 @@ public class LocalDateValueFactory extends AbstractDateTimeValueFactory<LocalDat
     }
 
     @Override
-    public LocalDate localCreateFromDatetime(InternalTimestamp its) {
+    public LocalDate localCreateFromDatetime(InternalTimestamp its) throws DataReadException {
         if (this.warningListener != null) {
             this.warningListener.warningEncountered(Messages.getString("ResultSet.PrecisionLostWarning", new Object[] { getTargetTypeName() }));
         }

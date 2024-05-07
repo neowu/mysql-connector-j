@@ -20,6 +20,9 @@
 
 package com.mysql.cj;
 
+import com.mysql.cj.exceptions.CJException;
+import com.mysql.cj.exceptions.WrongArgumentException;
+
 public interface CharsetSettings {
 
     public static final String CHARACTER_SET_CLIENT = "character_set_client";
@@ -55,7 +58,7 @@ public interface CharsetSettings {
      *
      * @return MySQL collation index to be used during the handshake.
      */
-    int configurePreHandshake(boolean reset);
+    int configurePreHandshake(boolean reset) throws WrongArgumentException;
 
     /**
      * Sets up client character set. This must be done before any further communication with the server!
@@ -67,9 +70,9 @@ public interface CharsetSettings {
      * @param dontCheckServerMatch
      *            if true then send the SET NAMES query even if server charset already matches the new value; needed for changeUser call.
      */
-    void configurePostHandshake(boolean dontCheckServerMatch);
+    void configurePostHandshake(boolean dontCheckServerMatch) throws CJException;
 
-    public boolean doesPlatformDbCharsetMatches();
+    boolean doesPlatformDbCharsetMatches();
 
     String getPasswordCharacterEncoding();
 
@@ -82,8 +85,6 @@ public interface CharsetSettings {
     boolean getRequiresEscapingEncoder();
 
     String getJavaEncodingForCollationIndex(int collationIndex);
-
-    int getMaxBytesPerChar(String javaCharsetName);
 
     int getMaxBytesPerChar(Integer charsetIndex, String javaCharsetName);
 

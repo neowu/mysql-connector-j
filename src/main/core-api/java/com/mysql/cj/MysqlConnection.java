@@ -20,23 +20,16 @@
 
 package com.mysql.cj;
 
+import com.mysql.cj.exceptions.CJException;
+
+import java.sql.SQLException;
 import java.util.Properties;
 
-import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.protocol.ServerSessionStateController;
-
 public interface MysqlConnection {
-
-    PropertySet getPropertySet();
-
     /**
      * Creates an IO channel to the server.
-     *
-     * @param isForReconnect
-     *            is this request for a re-connect
      */
-    void createNewIO(boolean isForReconnect);
+    void createNewIO() throws CJException;
 
     long getId();
 
@@ -47,19 +40,9 @@ public interface MysqlConnection {
      */
     Properties getProperties();
 
-    Object getConnectionMutex();
-
     Session getSession();
 
-    String getURL();
-
-    String getUser();
-
-    ExceptionInterceptor getExceptionInterceptor();
-
-    void checkClosed();
-
-    void normalClose();
+    void checkClosed() throws SQLException;
 
     /**
      * Destroys this connection and any underlying resources.
@@ -68,7 +51,4 @@ public interface MysqlConnection {
      *            exception caused the connection clean up
      */
     void cleanup(Throwable whyCleanedUp);
-
-    ServerSessionStateController getServerSessionStateController();
-
 }

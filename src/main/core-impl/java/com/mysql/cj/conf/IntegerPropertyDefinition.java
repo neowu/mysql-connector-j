@@ -20,10 +20,6 @@
 
 package com.mysql.cj.conf;
 
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.exceptions.WrongArgumentException;
-
 public class IntegerPropertyDefinition extends AbstractPropertyDefinition<Integer> {
 
     private static final long serialVersionUID = 4151893695173946081L;
@@ -32,12 +28,12 @@ public class IntegerPropertyDefinition extends AbstractPropertyDefinition<Intege
 
     public IntegerPropertyDefinition(PropertyKey key, int defaultValue, boolean isRuntimeModifiable, String description, String sinceVersion, String category,
             int orderInCategory) {
-        super(key, Integer.valueOf(defaultValue), isRuntimeModifiable, description, sinceVersion, category, orderInCategory);
+        super(key, Integer.valueOf(defaultValue), isRuntimeModifiable, description, category);
     }
 
     public IntegerPropertyDefinition(PropertyKey key, int defaultValue, boolean isRuntimeModifiable, String description, String sinceVersion, String category,
             int orderInCategory, int lowerBound, int upperBound) {
-        super(key, Integer.valueOf(defaultValue), isRuntimeModifiable, description, sinceVersion, category, orderInCategory, lowerBound, upperBound);
+        super(key, Integer.valueOf(defaultValue), isRuntimeModifiable, description, sinceVersion, category, lowerBound, upperBound);
     }
 
     @Override
@@ -46,8 +42,8 @@ public class IntegerPropertyDefinition extends AbstractPropertyDefinition<Intege
     }
 
     @Override
-    public Integer parseObject(String value, ExceptionInterceptor exceptionInterceptor) {
-        return integerFrom(getName(), value, this.multiplier, exceptionInterceptor);
+    public Integer parseObject(String value) {
+        return integerFrom(getName(), value, this.multiplier);
     }
 
     /**
@@ -60,7 +56,7 @@ public class IntegerPropertyDefinition extends AbstractPropertyDefinition<Intege
         return new IntegerProperty(this);
     }
 
-    public static Integer integerFrom(String name, String value, int multiplier, ExceptionInterceptor exceptionInterceptor) {
+    public static Integer integerFrom(String name, String value, int multiplier) {
         try {
             // Parse decimals, too
             int intValue = (int) (Double.parseDouble(value) * multiplier);
@@ -70,9 +66,7 @@ public class IntegerPropertyDefinition extends AbstractPropertyDefinition<Intege
             return intValue;
 
         } catch (NumberFormatException nfe) {
-            throw ExceptionFactory.createException(WrongArgumentException.class,
-                    "The connection property '" + name + "' only accepts integer values. The value '" + value + "' can not be converted to an integer.",
-                    exceptionInterceptor);
+            throw new Error("The connection property '" + name + "' only accepts integer values. The value '" + value + "' can not be converted to an integer.");
         }
     }
 

@@ -20,15 +20,6 @@
 
 package com.mysql.cj.jdbc;
 
-import static com.mysql.cj.util.StringUtils.isNullOrEmpty;
-
-import java.sql.DriverPropertyInfo;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.util.List;
-import java.util.Properties;
-import java.util.logging.Logger;
-
 import com.mysql.cj.Constants;
 import com.mysql.cj.Messages;
 import com.mysql.cj.conf.ConnectionUrl;
@@ -39,10 +30,18 @@ import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.exceptions.UnableToConnectException;
 import com.mysql.cj.exceptions.UnsupportedConnectionStringException;
-import com.mysql.cj.jdbc.ha.FailoverConnectionProxy;
-import com.mysql.cj.jdbc.ha.LoadBalancedConnectionProxy;
-import com.mysql.cj.jdbc.ha.ReplicationConnectionProxy;
+import com.mysql.cj.exceptions.WrongArgumentException;
+import com.mysql.cj.jdbc.exceptions.SQLExceptionsMapping;
 import com.mysql.cj.util.StringUtils;
+
+import java.sql.DriverPropertyInfo;
+import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.util.List;
+import java.util.Properties;
+import java.util.logging.Logger;
+
+import static com.mysql.cj.util.StringUtils.isNullOrEmpty;
 
 /**
  * The Java SQL framework allows for multiple database drivers. Each driver should supply a class that implements the Driver interface.
@@ -63,13 +62,6 @@ import com.mysql.cj.util.StringUtils;
  * </p>
  */
 public class NonRegisteringDriver implements java.sql.Driver {
-
-    static {
-        try {
-            Class.forName(AbandonedConnectionCleanupThread.class.getName());
-        } catch (ClassNotFoundException e) {
-        }
-    }
 
     /**
      * Construct a new driver and register it with DriverManager.
@@ -131,7 +123,11 @@ public class NonRegisteringDriver implements java.sql.Driver {
      */
     @Override
     public boolean acceptsURL(String url) throws SQLException {
-        return ConnectionUrl.acceptsUrl(url);
+        try {
+            return ConnectionUrl.acceptsUrl(url);
+        } catch (WrongArgumentException e) {
+            throw SQLExceptionsMapping.translateException(e);
+        }
     }
 
     /**
@@ -178,19 +174,6 @@ public class NonRegisteringDriver implements java.sql.Driver {
             switch (conStr.getType()) {
                 case SINGLE_CONNECTION:
                     return com.mysql.cj.jdbc.ConnectionImpl.getInstance(conStr.getMainHost());
-
-                case FAILOVER_CONNECTION:
-                case FAILOVER_DNS_SRV_CONNECTION:
-                    return FailoverConnectionProxy.createProxyInstance(conStr);
-
-                case LOADBALANCE_CONNECTION:
-                case LOADBALANCE_DNS_SRV_CONNECTION:
-                    return LoadBalancedConnectionProxy.createProxyInstance(conStr);
-
-                case REPLICATION_CONNECTION:
-                case REPLICATION_DNS_SRV_CONNECTION:
-                    return ReplicationConnectionProxy.createProxyInstance(conStr);
-
                 default:
                     return null;
             }
@@ -200,8 +183,8 @@ public class NonRegisteringDriver implements java.sql.Driver {
             return null;
 
         } catch (CJException ex) {
-            throw ExceptionFactory.createException(UnableToConnectException.class,
-                    Messages.getString("NonRegisteringDriver.17", new Object[] { ex.toString() }), ex);
+            throw SQLExceptionsMapping.translateException(ExceptionFactory.createException(UnableToConnectException.class,
+                    Messages.getString("NonRegisteringDriver.17", new Object[] { ex.toString() }), ex));
         }
     }
 
@@ -224,7 +207,12 @@ public class NonRegisteringDriver implements java.sql.Driver {
         String password = "";
 
         if (!isNullOrEmpty(url)) {
-            ConnectionUrl connStr = ConnectionUrl.getConnectionUrlInstance(url, info);
+            ConnectionUrl connStr;
+            try {
+                connStr = ConnectionUrl.getConnectionUrlInstance(url, info);
+            } catch (UnsupportedConnectionStringException|WrongArgumentException e) {
+                throw SQLExceptionsMapping.translateException(e);
+            }
             if (connStr.getType() == Type.SINGLE_CONNECTION) {
                 HostInfo hostInfo = connStr.getMainHost();
                 info = hostInfo.exposeAsProperties();

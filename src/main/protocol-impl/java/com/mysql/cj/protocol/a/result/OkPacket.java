@@ -20,14 +20,12 @@
 
 package com.mysql.cj.protocol.a.result;
 
-import static com.mysql.cj.protocol.a.NativeServerSession.SERVER_SESSION_STATE_CHANGED;
-
+import com.mysql.cj.exceptions.WrongArgumentException;
 import com.mysql.cj.protocol.ProtocolEntity;
 import com.mysql.cj.protocol.ServerSession;
 import com.mysql.cj.protocol.a.NativeConstants.IntegerDataType;
 import com.mysql.cj.protocol.a.NativeConstants.StringSelfDataType;
 import com.mysql.cj.protocol.a.NativePacketPayload;
-import com.mysql.cj.protocol.a.NativeServerSessionStateController.NativeServerSessionStateChanges;
 
 public class OkPacket implements ProtocolEntity {
 
@@ -36,13 +34,11 @@ public class OkPacket implements ProtocolEntity {
     private int statusFlags = 0;
     private int warningCount = 0;
     private String info = null;
-    private NativeServerSessionStateChanges sessionStateChanges;
 
     private OkPacket() {
-        this.sessionStateChanges = new NativeServerSessionStateChanges();
     }
 
-    public static OkPacket parse(NativePacketPayload buf, ServerSession session) {
+    public static OkPacket parse(NativePacketPayload buf, ServerSession session) throws WrongArgumentException {
         String errMsgEnc = session.getCharsetSettings().getErrorMessageEncoding();
 
         OkPacket ok = new OkPacket();
@@ -54,11 +50,6 @@ public class OkPacket implements ProtocolEntity {
         ok.setStatusFlags((int) buf.readInteger(IntegerDataType.INT2));
         ok.setWarningCount((int) buf.readInteger(IntegerDataType.INT2));
         ok.setInfo(buf.readString(StringSelfDataType.STRING_LENENC, errMsgEnc)); // info
-
-        if (session.isSessionStateTrackingEnabled() && (ok.getStatusFlags() & SERVER_SESSION_STATE_CHANGED) != 0) {
-            // read session state changes info
-            ok.sessionStateChanges.init(buf, errMsgEnc);
-        }
 
         return ok;
     }
@@ -102,9 +93,4 @@ public class OkPacket implements ProtocolEntity {
     public void setWarningCount(int warningCount) {
         this.warningCount = warningCount;
     }
-
-    public NativeServerSessionStateChanges getSessionStateChanges() {
-        return this.sessionStateChanges;
-    }
-
 }

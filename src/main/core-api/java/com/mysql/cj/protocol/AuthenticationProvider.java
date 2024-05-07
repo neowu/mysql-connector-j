@@ -21,13 +21,13 @@
 package com.mysql.cj.protocol;
 
 import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
+import com.mysql.cj.exceptions.CJException;
 
 public interface AuthenticationProvider<M extends Message> {
 
-    void init(Protocol<M> prot, PropertySet propertySet, ExceptionInterceptor exceptionInterceptor);
+    void init(Protocol<M> prot, PropertySet propertySet);
 
-    void connect(String username, String password, String database);
+    void connect(String username, String password, String database) throws CJException;
 
     /**
      * Re-authenticates as the given user and password
@@ -39,6 +39,6 @@ public interface AuthenticationProvider<M extends Message> {
      * @param database
      *            db name
      */
-    void changeUser(String username, String password, String database);
+    void changeUser(String username, String password, String database) throws CJException;
 
 }

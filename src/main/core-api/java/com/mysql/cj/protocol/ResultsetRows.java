@@ -23,8 +23,11 @@ package com.mysql.cj.protocol;
 import com.mysql.cj.Messages;
 import com.mysql.cj.exceptions.CJOperationNotSupportedException;
 import com.mysql.cj.exceptions.ExceptionFactory;
+import com.mysql.cj.jdbc.exceptions.SQLExceptionsMapping;
 import com.mysql.cj.result.Row;
 import com.mysql.cj.result.RowList;
+
+import java.sql.SQLException;
 
 /**
  * This interface abstracts away how row data is accessed by the result set. It is meant to allow a static implementation (Current version), and a streaming
@@ -33,45 +36,29 @@ import com.mysql.cj.result.RowList;
 public interface ResultsetRows extends RowList, ProtocolEntity {
 
     /**
-     * Adds a row.
-     *
-     * @param row
-     *            the row to add
-     */
-    default void addRow(Row row) {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
-    }
-
-    /**
      * Moves to after last.
      *
      */
-    default void afterLast() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
+    default void afterLast() throws SQLException {
+        throw SQLExceptionsMapping.translateException(ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0")));
     }
 
     /**
      * Moves to before first.
      *
      */
-    default void beforeFirst() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
+    default void beforeFirst() throws SQLException {
+        throw SQLExceptionsMapping.translateException(ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0")));
     }
 
     /**
      * Moves to before last.
      *
      */
-    default void beforeLast() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
+    default void beforeLast() throws SQLException {
+        throw SQLExceptionsMapping.translateException(ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0")));
     }
 
-    /**
-     * We're done.
-     *
-     */
-    default void close() {
-    }
 
     /**
      * Returns the result set that 'owns' this RowData
@@ -111,17 +98,15 @@ public interface ResultsetRows extends RowList, ProtocolEntity {
      *
      * @return true if no records
      */
-    default boolean isEmpty() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
-    }
+    boolean isEmpty();
 
     /**
      * Are we on the first row of the result set?
      *
      * @return true if on first row
      */
-    default boolean isFirst() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
+    default boolean isFirst() throws SQLException {
+        throw SQLExceptionsMapping.translateException(ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0")));
     }
 
     /**
@@ -129,8 +114,8 @@ public interface ResultsetRows extends RowList, ProtocolEntity {
      *
      * @return true if on last row
      */
-    default boolean isLast() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
+    default boolean isLast() throws SQLException {
+        throw SQLExceptionsMapping.translateException(ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0")));
     }
 
     /**
@@ -139,8 +124,8 @@ public interface ResultsetRows extends RowList, ProtocolEntity {
      * @param rows
      *            the relative number of rows to move
      */
-    default void moveRowRelative(int rows) {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
+    default void moveRowRelative(int rows) throws SQLException {
+        throw SQLExceptionsMapping.translateException(ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0")));
     }
 
     /**
@@ -149,8 +134,8 @@ public interface ResultsetRows extends RowList, ProtocolEntity {
      * @param rowNumber
      *            row to move to
      */
-    default void setCurrentRow(int rowNumber) {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0"));
+    default void setCurrentRow(int rowNumber) throws SQLException {
+        throw SQLExceptionsMapping.translateException(ExceptionFactory.createException(CJOperationNotSupportedException.class, Messages.getString("OperationNotSupportedException.0")));
     }
 
     /**
@@ -160,13 +145,6 @@ public interface ResultsetRows extends RowList, ProtocolEntity {
      *            the result set that 'owns' this RowData
      */
     void setOwner(ResultsetRowsOwner rs);
-
-    /**
-     * Did this result set have no rows?
-     *
-     * @return true if the result set did not have rows
-     */
-    boolean wasEmpty();
 
     /**
      * Sometimes the driver doesn't have metadata until after

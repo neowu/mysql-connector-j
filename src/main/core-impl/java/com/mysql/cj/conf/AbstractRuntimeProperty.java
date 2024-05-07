@@ -20,36 +20,20 @@
 
 package com.mysql.cj.conf;
 
-import java.io.Serializable;
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
+import com.mysql.cj.Messages;
 
 import javax.naming.RefAddr;
 import javax.naming.Reference;
+import java.util.Properties;
 
-import com.mysql.cj.Messages;
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.exceptions.PropertyNotModifiableException;
-
-public abstract class AbstractRuntimeProperty<T> implements RuntimeProperty<T>, Serializable {
-
-    private static final long serialVersionUID = -3424722534876438236L;
-
-    private PropertyDefinition<T> propertyDefinition;
+public abstract class AbstractRuntimeProperty<T> implements RuntimeProperty<T> {
+    private final PropertyDefinition<T> propertyDefinition;
 
     protected T value;
 
     protected T initialValue;
 
     protected boolean wasExplicitlySet = false;
-
-    private List<WeakReference<RuntimePropertyListener>> listeners;
-
-    public AbstractRuntimeProperty() {
-    }
 
     protected AbstractRuntimeProperty(PropertyDefinition<T> propertyDefinition) {
         this.propertyDefinition = propertyDefinition;
@@ -63,31 +47,31 @@ public abstract class AbstractRuntimeProperty<T> implements RuntimeProperty<T>, 
     }
 
     @Override
-    public void initializeFrom(Properties extractFrom, ExceptionInterceptor exceptionInterceptor) {
+    public void initializeFrom(Properties extractFrom) {
         String name = getPropertyDefinition().getName();
         String alias = getPropertyDefinition().getCcAlias();
         if (extractFrom.containsKey(name)) {
             String extractedValue = (String) extractFrom.remove(name);
             if (extractedValue != null) {
-                setValueInternal(extractedValue, exceptionInterceptor);
+                setValueInternal(extractedValue);
                 this.initialValue = this.value;
             }
         } else if (alias != null && extractFrom.containsKey(alias)) {
             String extractedValue = (String) extractFrom.remove(alias);
             if (extractedValue != null) {
-                setValueInternal(extractedValue, exceptionInterceptor);
+                setValueInternal(extractedValue);
                 this.initialValue = this.value;
             }
         }
     }
 
     @Override
-    public void initializeFrom(Reference ref, ExceptionInterceptor exceptionInterceptor) {
+    public void initializeFrom(Reference ref) {
         RefAddr refAddr = ref.get(getPropertyDefinition().getName());
         if (refAddr != null) {
             String refContentAsString = (String) refAddr.getContent();
             if (refContentAsString != null) {
-                setValueInternal(refContentAsString, exceptionInterceptor);
+                setValueInternal(refContentAsString);
                 this.initialValue = this.value;
             }
         }
@@ -96,56 +80,11 @@ public abstract class AbstractRuntimeProperty<T> implements RuntimeProperty<T>, 
     @Override
     public void resetValue() {
         this.value = this.initialValue;
-        invokeListeners();
     }
 
     @Override
     public boolean isExplicitlySet() {
         return this.wasExplicitlySet;
-    }
-
-    @Override
-    public void addListener(RuntimePropertyListener l) {
-        if (this.listeners == null) {
-            this.listeners = new ArrayList<>();
-        }
-
-        boolean found = false;
-        for (WeakReference<RuntimePropertyListener> weakReference : this.listeners) {
-            if (l.equals(weakReference.get())) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            this.listeners.add(new WeakReference<>(l));
-        }
-    }
-
-    @Override
-    public void removeListener(RuntimePropertyListener listener) {
-        if (this.listeners != null) {
-            for (WeakReference<RuntimePropertyListener> wr : this.listeners) {
-                RuntimePropertyListener l = wr.get();
-                if (l.equals(listener)) {
-                    this.listeners.remove(wr);
-                    break;
-                }
-            }
-        }
-    }
-
-    protected void invokeListeners() {
-        if (this.listeners != null) {
-            for (WeakReference<RuntimePropertyListener> wr : this.listeners) {
-                RuntimePropertyListener l = wr.get();
-                if (l != null) {
-                    l.handlePropertyChange(this);
-                } else {
-                    this.listeners.remove(wr);
-                }
-            }
-        }
     }
 
     @Override
@@ -165,15 +104,12 @@ public abstract class AbstractRuntimeProperty<T> implements RuntimeProperty<T>, 
 
     /**
      * Set the value of a property from a string value.
-     * It involves the {@link PropertyDefinition#parseObject(String, ExceptionInterceptor)} to validate and parse the string.
      *
      * @param value
      *            value
-     * @param exceptionInterceptor
-     *            exception interceptor
      */
-    public void setValueInternal(String value, ExceptionInterceptor exceptionInterceptor) {
-        setValueInternal(getPropertyDefinition().parseObject(value, exceptionInterceptor), value, exceptionInterceptor);
+    public void setValueInternal(String value) {
+        setValueInternal(getPropertyDefinition().parseObject(value), value);
     }
 
     /**
@@ -183,12 +119,10 @@ public abstract class AbstractRuntimeProperty<T> implements RuntimeProperty<T>, 
      *            value
      * @param valueAsString
      *            value represented by String
-     * @param exceptionInterceptor
-     *            exception interceptor
      */
-    public void setValueInternal(T value, String valueAsString, ExceptionInterceptor exceptionInterceptor) {
+    public void setValueInternal(T value, String valueAsString) {
         if (getPropertyDefinition().isRangeBased()) {
-            checkRange(value, valueAsString, exceptionInterceptor);
+            checkRange(value, valueAsString);
         }
         this.value = value;
         this.wasExplicitlySet = true;
@@ -201,25 +135,17 @@ public abstract class AbstractRuntimeProperty<T> implements RuntimeProperty<T>, 
      *            value
      * @param valueAsString
      *            value represented by String
-     * @param exceptionInterceptor
-     *            exception interceptor
      */
-    protected void checkRange(T val, String valueAsString, ExceptionInterceptor exceptionInterceptor) {
+    protected void checkRange(T val, String valueAsString) {
         // no-op for not range-based properties
     }
 
     @Override
     public void setValue(T value) {
-        setValue(value, null);
-    }
-
-    @Override
-    public void setValue(T value, ExceptionInterceptor exceptionInterceptor) {
         if (getPropertyDefinition().isRuntimeModifiable()) {
-            setValueInternal(value, null, exceptionInterceptor);
-            invokeListeners();
+            setValueInternal(value, null);
         } else {
-            throw ExceptionFactory.createException(PropertyNotModifiableException.class,
+            throw new Error(
                     Messages.getString("ConnectionProperties.dynamicChangeIsNotAllowed", new Object[] { "'" + getPropertyDefinition().getName() + "'" }));
         }
     }

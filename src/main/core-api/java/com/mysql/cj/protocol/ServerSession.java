@@ -20,13 +20,12 @@
 
 package com.mysql.cj.protocol;
 
-import java.util.Map;
-import java.util.TimeZone;
-
 import com.mysql.cj.CharsetSettings;
 import com.mysql.cj.ServerVersion;
-import com.mysql.cj.exceptions.CJOperationNotSupportedException;
-import com.mysql.cj.exceptions.ExceptionFactory;
+import com.mysql.cj.exceptions.CJException;
+
+import java.util.Map;
+import java.util.TimeZone;
 
 /**
  * Keeps the effective states of server/session variables,
@@ -112,8 +111,6 @@ public interface ServerSession {
 
     boolean useMultiResults();
 
-    boolean isSessionStateTrackingEnabled();
-
     boolean isEOFDeprecated();
 
     boolean supportsQueryAttributes();
@@ -160,13 +157,13 @@ public interface ServerSession {
 
     boolean useAnsiQuotedIdentifiers();
 
-    public boolean isServerTruncatesFracSecs();
+    boolean isServerTruncatesFracSecs();
 
     boolean isAutoCommit();
 
     void setAutoCommit(boolean autoCommit);
 
-    TimeZone getSessionTimeZone();
+    TimeZone getSessionTimeZone() throws CJException;
 
     void setSessionTimeZone(TimeZone sessionTimeZone);
 
@@ -177,10 +174,6 @@ public interface ServerSession {
      * @return The default JVM time zone
      */
     TimeZone getDefaultTimeZone();
-
-    default ServerSessionStateController getServerSessionStateController() {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not supported");
-    }
 
     CharsetSettings getCharsetSettings();
 

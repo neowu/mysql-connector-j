@@ -20,11 +20,11 @@
 
 package com.mysql.cj.protocol;
 
+import com.mysql.cj.exceptions.CJPacketTooBigException;
+import com.mysql.cj.exceptions.WrongArgumentException;
+
 import java.io.IOException;
 import java.util.Optional;
-
-import com.mysql.cj.exceptions.CJOperationNotSupportedException;
-import com.mysql.cj.exceptions.ExceptionFactory;
 
 public interface MessageReader<H extends MessageHeader, M extends Message> {
 
@@ -35,7 +35,7 @@ public interface MessageReader<H extends MessageHeader, M extends Message> {
      * @throws IOException
      *             if an error occurs
      */
-    H readHeader() throws IOException;
+    H readHeader() throws IOException, CJPacketTooBigException;
 
     /**
      * Read the next message header from server, possibly blocking indefinitely until the message is received,
@@ -45,7 +45,7 @@ public interface MessageReader<H extends MessageHeader, M extends Message> {
      * @throws IOException
      *             if an error occurs
      */
-    default H probeHeader() throws IOException {
+    default H probeHeader() throws IOException, CJPacketTooBigException {
         return readHeader();
     }
 
@@ -62,7 +62,7 @@ public interface MessageReader<H extends MessageHeader, M extends Message> {
      * @throws IOException
      *             if an error occurs
      */
-    M readMessage(Optional<M> reuse, H header) throws IOException;
+    M readMessage(Optional<M> reuse, H header) throws IOException, CJPacketTooBigException, WrongArgumentException;
 
     /**
      * Read message from server into to the given {@link Message} instance or into the new one if not present
@@ -78,25 +78,8 @@ public interface MessageReader<H extends MessageHeader, M extends Message> {
      * @throws IOException
      *             if an error occurs
      */
-    default M probeMessage(Optional<M> reuse, H header) throws IOException {
+    default M probeMessage(Optional<M> reuse, H header) throws IOException, CJPacketTooBigException, WrongArgumentException {
         return readMessage(reuse, header);
-    }
-
-    /**
-     * Read message from server into to the given {@link Message} instance or into the new one if not present.
-     * For asynchronous channel it synchronously reads the next message in the stream, blocking until the message is read fully.
-     * Could throw WrongArgumentException if the expected message type is not the next message (exception will be thrown in *caller* context).
-     *
-     * @param reuse
-     *            {@link Message} object to reuse. May be ignored by implementation.
-     * @param expectedType
-     *            Expected type of message.
-     * @return {@link Message} instance
-     * @throws IOException
-     *             if an error occurs
-     */
-    default M readMessage(Optional<M> reuse, int expectedType) throws IOException {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not supported");
     }
 
     /**
@@ -105,18 +88,8 @@ public interface MessageReader<H extends MessageHeader, M extends Message> {
      * @throws IOException
      *             if an error occurs
      */
-    default void skipPacket() throws IOException {
+    default void skipPacket() throws IOException, CJPacketTooBigException, WrongArgumentException {
         readMessage(Optional.empty(), readHeader());
-    }
-
-    /**
-     * Queue a {@link MessageListener} to receive messages delivered asynchronously.
-     *
-     * @param l
-     *            {@link MessageListener}
-     */
-    default void pushMessageListener(MessageListener<M> l) {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not supported");
     }
 
     /**
@@ -145,27 +118,9 @@ public interface MessageReader<H extends MessageHeader, M extends Message> {
     }
 
     /**
-     * Return the previous MessageReader instance from the decorators chain or the current MessageReader
-     * if it is the first entry in a chain.
-     *
-     * @return {@link MessageReader}
-     */
-    default MessageReader<H, M> undecorate() {
-        return this;
-    }
-
-    /**
      * Start reading messages reader from the provided channel.
      */
     default void start() {
         // no-op
     }
-
-    /**
-     * Signal to the reader that it should stop reading messages after reading the next message.
-     */
-    default void stopAfterNextMessage() {
-        // no-op
-    }
-
 }

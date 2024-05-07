@@ -22,9 +22,6 @@ package com.mysql.cj.protocol;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
-
-import com.mysql.cj.log.Log;
 
 /**
  * A non-blocking buffered input stream. Reads more if it can, won't block to fill the buffer, only blocks to satisfy a request of read(byte[])
@@ -40,10 +37,6 @@ public class ReadAheadInputStream extends InputStream {
     protected int endOfCurrentData;
 
     protected int currentPosition;
-
-    protected boolean doDebug = false;
-
-    protected Log log;
 
     private void fill(int readAtLeastTheseManyBytes) throws IOException {
         checkClosed();
@@ -65,36 +58,6 @@ public class ReadAheadInputStream extends InputStream {
             bytesToRead = Math.min(this.buf.length - this.currentPosition, bytesAvailable);
         }
 
-        if (this.doDebug) {
-            StringBuilder debugBuf = new StringBuilder();
-            debugBuf.append("  ReadAheadInputStream.fill(");
-            debugBuf.append(readAtLeastTheseManyBytes);
-            debugBuf.append("), buffer_size=");
-            debugBuf.append(this.buf.length);
-            debugBuf.append(", current_position=");
-            debugBuf.append(this.currentPosition);
-            debugBuf.append(", need to read ");
-            debugBuf.append(Math.min(this.buf.length - this.currentPosition, readAtLeastTheseManyBytes));
-            debugBuf.append(" bytes to fill request,");
-
-            if (bytesAvailable > 0) {
-                debugBuf.append(" underlying InputStream reports ");
-                debugBuf.append(bytesAvailable);
-
-                debugBuf.append(" total bytes available,");
-            }
-
-            debugBuf.append(" attempting to read ");
-            debugBuf.append(bytesToRead);
-            debugBuf.append(" bytes.");
-
-            if (this.log != null) {
-                this.log.logTrace(debugBuf.toString());
-            } else {
-                System.err.println(debugBuf.toString());
-            }
-        }
-
         int n = this.underlyingStream.read(this.buf, this.currentPosition, bytesToRead);
 
         if (n > 0) {
@@ -106,31 +69,6 @@ public class ReadAheadInputStream extends InputStream {
         checkClosed();
 
         int avail = this.endOfCurrentData - this.currentPosition;
-
-        if (this.doDebug) {
-            StringBuilder debugBuf = new StringBuilder();
-            debugBuf.append("ReadAheadInputStream.readIfNecessary(");
-            debugBuf.append(Arrays.toString(b));
-            debugBuf.append(",");
-            debugBuf.append(off);
-            debugBuf.append(",");
-            debugBuf.append(len);
-            debugBuf.append(")");
-
-            if (avail <= 0) {
-                debugBuf.append(" not all data available in buffer, must read from stream");
-
-                if (len >= this.buf.length) {
-                    debugBuf.append(", amount requested > buffer, returning direct read() from stream");
-                }
-            }
-
-            if (this.log != null) {
-                this.log.logTrace(debugBuf.toString());
-            } else {
-                System.err.println(debugBuf.toString());
-            }
-        }
 
         if (avail <= 0) {
 
@@ -157,7 +95,7 @@ public class ReadAheadInputStream extends InputStream {
     }
 
     @Override
-    public synchronized int read(byte b[], int off, int len) throws IOException {
+    public int read(byte b[], int off, int len) throws IOException {
         checkClosed(); // Check for closed stream
         if ((off | len | off + len | b.length - (off + len)) < 0) {
             throw new IndexOutOfBoundsException();
@@ -218,15 +156,9 @@ public class ReadAheadInputStream extends InputStream {
         }
     }
 
-    public ReadAheadInputStream(InputStream toBuffer, boolean debug, Log logTo) {
-        this(toBuffer, DEFAULT_BUFFER_SIZE, debug, logTo);
-    }
-
-    public ReadAheadInputStream(InputStream toBuffer, int bufferSize, boolean debug, Log logTo) {
+    public ReadAheadInputStream(InputStream toBuffer, int bufferSize) {
         this.underlyingStream = toBuffer;
         this.buf = new byte[bufferSize];
-        this.doDebug = debug;
-        this.log = logTo;
     }
 
     @Override
@@ -237,7 +169,6 @@ public class ReadAheadInputStream extends InputStream {
             } finally {
                 this.underlyingStream = null;
                 this.buf = null;
-                this.log = null;
             }
         }
     }

@@ -20,40 +20,25 @@
 
 package com.mysql.cj;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetEncoder;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.RuntimeProperty;
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.ExceptionFactory;
 import com.mysql.cj.exceptions.WrongArgumentException;
-import com.mysql.cj.protocol.Resultset;
-import com.mysql.cj.protocol.Resultset.Type;
 import com.mysql.cj.protocol.ServerCapabilities;
 import com.mysql.cj.protocol.ServerSession;
 import com.mysql.cj.protocol.a.NativeConstants;
 import com.mysql.cj.protocol.a.NativeMessageBuilder;
-import com.mysql.cj.protocol.a.NativePacketPayload;
-import com.mysql.cj.protocol.a.ResultsetFactory;
-import com.mysql.cj.result.IntegerValueFactory;
-import com.mysql.cj.result.Row;
-import com.mysql.cj.result.StringValueFactory;
-import com.mysql.cj.result.ValueFactory;
-import com.mysql.cj.telemetry.TelemetryAttribute;
-import com.mysql.cj.telemetry.TelemetryScope;
-import com.mysql.cj.telemetry.TelemetrySpan;
-import com.mysql.cj.telemetry.TelemetrySpanName;
 import com.mysql.cj.util.StringUtils;
+
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 public class NativeCharsetSettings extends CharsetMapping implements CharsetSettings {
 
@@ -85,10 +70,7 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
     private String errorMessageEncoding = "Cp1252"; // to begin with, changes after we talk to the server
 
     protected RuntimeProperty<String> characterEncoding;
-    protected RuntimeProperty<String> passwordCharacterEncoding;
-    protected RuntimeProperty<String> characterSetResults;
     protected RuntimeProperty<String> connectionCollation;
-    protected RuntimeProperty<Boolean> cacheServerConfiguration;
 
     /**
      * If a CharsetEncoder is required for escaping. Needed for SJIS and related problems with \u00A5.
@@ -96,24 +78,6 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
     private boolean requiresEscapingEncoder;
 
     private NativeMessageBuilder commandBuilder = null;
-
-    private static final Map<String, Map<Integer, String>> customCollationIndexToCollationNameByUrl = new HashMap<>();
-    private static final Map<String, Map<String, Integer>> customCollationNameToCollationIndexByUrl = new HashMap<>();
-
-    /**
-     * Actual collation index to mysql charset name map of user defined charsets for given server URLs.
-     */
-    private static final Map<String, Map<Integer, String>> customCollationIndexToCharsetNameByUrl = new HashMap<>();
-
-    /**
-     * Actual mysql charset name to mblen map of user defined charsets for given server URLs.
-     */
-    private static final Map<String, Map<String, Integer>> customCharsetNameToMblenByUrl = new HashMap<>();
-
-    private static final Map<String, Map<String, String>> customCharsetNameToJavaEncodingByUrl = new HashMap<>();
-    private static final Map<String, Map<String, Integer>> customCharsetNameToCollationIndexByUrl = new HashMap<>();
-    private static final Map<String, Map<String, String>> customJavaEncodingUcToCharsetNameByUrl = new HashMap<>();
-    private static final Map<String, Set<String>> customMultibyteEncodingsByUrl = new HashMap<>();
 
     /**
      * Does the character set of this connection match the character set of the platform
@@ -150,52 +114,11 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
         this.serverSession = this.session.getServerSession();
 
         this.characterEncoding = sess.getPropertySet().getStringProperty(PropertyKey.characterEncoding);
-        this.characterSetResults = this.session.getPropertySet().getProperty(PropertyKey.characterSetResults);
-        this.passwordCharacterEncoding = this.session.getPropertySet().getStringProperty(PropertyKey.passwordCharacterEncoding);
         this.connectionCollation = this.session.getPropertySet().getStringProperty(PropertyKey.connectionCollation);
-        this.cacheServerConfiguration = sess.getPropertySet().getBooleanProperty(PropertyKey.cacheServerConfiguration);
-
-        tryAndFixEncoding(this.characterEncoding, true);
-        tryAndFixEncoding(this.passwordCharacterEncoding, true);
-        if (!"null".equalsIgnoreCase(this.characterSetResults.getValue())) { // the "null" instead of an encoding name is allowed for characterSetResults
-            tryAndFixEncoding(this.characterSetResults, false);
-        }
-    }
-
-    /**
-     * Attempt to use the encoding, and bail out if it can't be used.
-     *
-     * @param encodingProperty
-     *            connection property containing the Java encoding to try
-     * @param replaceImpermissibleEncodings
-     *            The character_set_client system variable cannot be set to ucs2, utf16, utf16le, utf32 charsets. If "true" the corresponding connection
-     *            property value will be replaced with "UTF-8"
-     */
-    private void tryAndFixEncoding(RuntimeProperty<String> encodingProperty, boolean replaceImpermissibleEncodings) {
-        String oldEncoding = encodingProperty.getValue();
-        if (oldEncoding != null) {
-            if (replaceImpermissibleEncodings && ("UnicodeBig".equalsIgnoreCase(oldEncoding) || "UTF-16".equalsIgnoreCase(oldEncoding)
-                    || "UTF-16LE".equalsIgnoreCase(oldEncoding) || "UTF-32".equalsIgnoreCase(oldEncoding))) {
-                encodingProperty.setValue("UTF-8");
-            } else {
-                try {
-                    StringUtils.getBytes("abc", oldEncoding);
-                } catch (WrongArgumentException waEx) {
-                    // Try the MySQL character set name, then....
-                    String newEncoding = getStaticJavaEncodingForMysqlCharset(oldEncoding);
-                    if (newEncoding == null) {
-                        throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("StringUtils.0", new Object[] { oldEncoding }),
-                                this.session.getExceptionInterceptor());
-                    }
-                    StringUtils.getBytes("abc", newEncoding);
-                    encodingProperty.setValue(newEncoding);
-                }
-            }
-        }
     }
 
     @Override
-    public int configurePreHandshake(boolean reset) {
+    public int configurePreHandshake(boolean reset) throws WrongArgumentException {
         if (reset) {
             this.sessionCollationIndex = null;
         }
@@ -206,20 +129,18 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
         }
 
         ServerCapabilities capabilities = this.serverSession.getCapabilities();
-        String encoding = this.passwordCharacterEncoding.getStringValue();
-        if (encoding == null) {
-            String connectionColl = this.connectionCollation.getStringValue();
-            if ((connectionColl == null || (this.sessionCollationIndex = getStaticCollationIndexForCollationName(connectionColl)) == null)
-                    && (encoding = this.characterEncoding.getValue()) == null) {
-                // If none of "passwordCharacterEncoding", "connectionCollation" or "characterEncoding" is specified then use UTF-8.
-                // It would be better to use the server default collation here, to avoid unnecessary SET NAMES queries after the handshake if server
-                // default charset if not utf8, but we can not do it until server Bug#32729185 is fixed. Server cuts collation index to lower byte and, for
-                // example, if the server is started with character-set-server=utf8mb4 and collation-server=utf8mb4_is_0900_ai_ci (collation index 257) the
-                // Protocol::HandshakeV10 will contain character_set=1, "big5_chinese_ci". This is true not only for MySQL 8.0, where built-in collations with
-                // indexes > 255 were first introduced, but also other server series would be affected when configured with custom collations, for which the
-                // reserved collation id range is >= 1024.
-                this.sessionCollationIndex = MYSQL_COLLATION_INDEX_utf8mb4_0900_ai_ci;
-            }
+        String encoding = null;
+        String connectionColl = this.connectionCollation.getStringValue();
+        if ((connectionColl == null || (this.sessionCollationIndex = getStaticCollationIndexForCollationName(connectionColl)) == null)
+                && (encoding = this.characterEncoding.getValue()) == null) {
+            // If none of "passwordCharacterEncoding", "connectionCollation" or "characterEncoding" is specified then use UTF-8.
+            // It would be better to use the server default collation here, to avoid unnecessary SET NAMES queries after the handshake if server
+            // default charset if not utf8, but we can not do it until server Bug#32729185 is fixed. Server cuts collation index to lower byte and, for
+            // example, if the server is started with character-set-server=utf8mb4 and collation-server=utf8mb4_is_0900_ai_ci (collation index 257) the
+            // Protocol::HandshakeV10 will contain character_set=1, "big5_chinese_ci". This is true not only for MySQL 8.0, where built-in collations with
+            // indexes > 255 were first introduced, but also other server series would be affected when configured with custom collations, for which the
+            // reserved collation id range is >= 1024.
+            this.sessionCollationIndex = MYSQL_COLLATION_INDEX_utf8mb4_0900_ai_ci;
         }
 
         if (this.sessionCollationIndex == null) {
@@ -252,21 +173,20 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
     }
 
     @Override
-    public void configurePostHandshake(boolean dontCheckServerMatch) {
-        buildCollationMapping();
-
+    public void configurePostHandshake(boolean dontCheckServerMatch) throws CJException {
         /*
          * Configuring characterEncoding.
          */
 
         String requiredCollation = this.connectionCollation.getStringValue();
         String requiredEncoding = this.characterEncoding.getValue();
-        String passwordEncoding = this.passwordCharacterEncoding.getValue();
+
         Integer requiredCollationIndex;
         String sessionCharsetName = getServerDefaultCharset();
         String sessionCollationClause = "";
 
         try {
+
             // connectionCollation overrides the characterEncoding value
             if (requiredCollation != null && (requiredCollationIndex = getCollationIndexForCollationName(requiredCollation)) != null) {
                 if (isImpermissibleCollation(requiredCollationIndex)) {
@@ -292,29 +212,16 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
             } else { // Neither connectionCollation nor characterEncoding are defined.
                 // Collations with index > 255 don't fit into server greeting packet.
                 // Now we can set sessionCollationIndex according to "collation_server" value.
-                if (!StringUtils.isNullOrEmpty(passwordEncoding)) {
-                    if (this.serverSession.getCapabilities().getServerVersion().meetsMinimum(new ServerVersion(8, 0, 1))) {
-                        this.sessionCollationIndex = MYSQL_COLLATION_INDEX_utf8mb4_0900_ai_ci; // We can't do more, just trying to use utf8mb4_0900_ai_ci because the most of collations in that range are utf8mb4.
-                        requiredCollation = "utf8mb4_0900_ai_ci";
-                    } else {
-                        this.sessionCollationIndex = MYSQL_COLLATION_INDEX_utf8mb4_general_ci;
-                        requiredCollation = "utf8mb4_general_ci";
-                    }
-                    sessionCollationClause = " COLLATE " + getCollationNameForCollationIndex(this.sessionCollationIndex);
-                }
-
                 if ((requiredEncoding = getJavaEncodingForCollationIndex(this.sessionCollationIndex, requiredEncoding)) == null) {
                     // if there is no mapping for default collation index leave characterEncoding as specified by user
-                    throw ExceptionFactory.createException(Messages.getString("Connection.5", new Object[] { this.sessionCollationIndex.toString() }),
-                            this.session.getExceptionInterceptor());
+                    throw ExceptionFactory.createException(Messages.getString("Connection.5", new Object[] { this.sessionCollationIndex.toString() }));
                 }
 
                 sessionCharsetName = getMysqlCharsetNameForCollationIndex(this.sessionCollationIndex);
             }
 
         } catch (ArrayIndexOutOfBoundsException outOfBoundsEx) {
-            throw ExceptionFactory.createException(Messages.getString("Connection.6", new Object[] { this.sessionCollationIndex }),
-                    this.session.getExceptionInterceptor());
+            throw ExceptionFactory.createException(Messages.getString("Connection.6", new Object[] { this.sessionCollationIndex }));
         }
 
         this.characterEncoding.setValue(requiredEncoding);
@@ -324,9 +231,8 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
             boolean isCollationDifferent = sessionCollationClause.length() > 0
                     && !requiredCollation.equalsIgnoreCase(this.serverSession.getServerVariable(COLLATION_CONNECTION));
             if (dontCheckServerMatch || isCharsetDifferent || isCollationDifferent) {
-                String sql = "SET NAMES " + sessionCharsetName + sessionCollationClause;
-                telemetryWrapSendCommand(() -> this.session.getProtocol().sendCommand(getCommandBuilder().buildComQuery(null, this.session, sql), false, 0),
-                        TelemetrySpanName.SET_CHARSET);
+                this.session.getProtocol().sendCommand(getCommandBuilder().buildComQuery(null, "SET NAMES " + sessionCharsetName + sessionCollationClause),
+                        false, 0);
                 this.serverSession.getServerVariables().put(CHARACTER_SET_CLIENT, sessionCharsetName);
                 this.serverSession.getServerVariables().put(CHARACTER_SET_CONNECTION, sessionCharsetName);
 
@@ -351,39 +257,15 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
          */
 
         String sessionResultsCharset = this.serverSession.getServerVariable(CHARACTER_SET_RESULTS);
-        String characterSetResultsValue = this.characterSetResults.getValue();
-        if (StringUtils.isNullOrEmpty(characterSetResultsValue) || "null".equalsIgnoreCase(characterSetResultsValue)) {
-            if (!StringUtils.isNullOrEmpty(sessionResultsCharset) && !"NULL".equalsIgnoreCase(sessionResultsCharset)) {
-                telemetryWrapSendCommand(() -> this.session.getProtocol()
-                        .sendCommand(getCommandBuilder().buildComQuery(null, this.session, "SET character_set_results = NULL"), false, 0),
-                        TelemetrySpanName.SET_VARIABLE, "character_set_results");
-                this.serverSession.getServerVariables().put(CHARACTER_SET_RESULTS, null);
-            }
 
-            String defaultMetadataCharsetMysql = this.serverSession.getServerVariable("character_set_system");
-            this.metadataEncoding = defaultMetadataCharsetMysql != null ? getJavaEncodingForMysqlCharset(defaultMetadataCharsetMysql) : "UTF-8";
-            this.errorMessageEncoding = "UTF-8";
-
-        } else {
-            String resultsCharsetName = getMysqlCharsetForJavaEncoding(characterSetResultsValue.toUpperCase(Locale.ENGLISH),
-                    this.serverSession.getServerVersion());
-
-            if (resultsCharsetName == null) {
-                throw ExceptionFactory.createException(WrongArgumentException.class,
-                        Messages.getString("Connection.7", new Object[] { characterSetResultsValue }), this.session.getExceptionInterceptor());
-            }
-
-            if (!resultsCharsetName.equalsIgnoreCase(sessionResultsCharset)) {
-                telemetryWrapSendCommand(
-                        () -> this.session.getProtocol().sendCommand(
-                                getCommandBuilder().buildComQuery(null, this.session, "SET character_set_results = " + resultsCharsetName), false, 0),
-                        TelemetrySpanName.SET_VARIABLE, "character_set_results");
-                this.serverSession.getServerVariables().put(CHARACTER_SET_RESULTS, resultsCharsetName);
-            }
-
-            this.metadataEncoding = characterSetResultsValue;
-            this.errorMessageEncoding = characterSetResultsValue;
+        if (!StringUtils.isNullOrEmpty(sessionResultsCharset) && !"NULL".equalsIgnoreCase(sessionResultsCharset)) {
+            this.session.getProtocol().sendCommand(getCommandBuilder().buildComQuery(null, "SET character_set_results = NULL"), false, 0);
+            this.serverSession.getServerVariables().put(CHARACTER_SET_RESULTS, null);
         }
+
+        String defaultMetadataCharsetMysql = this.serverSession.getServerVariable("character_set_system");
+        this.metadataEncoding = defaultMetadataCharsetMysql != null ? getJavaEncodingForMysqlCharset(defaultMetadataCharsetMysql) : "UTF-8";
+        this.errorMessageEncoding = "UTF-8";
 
         this.metadataCollationIndex = getCollationIndexForJavaEncoding(this.metadataEncoding, this.serverSession.getServerVersion());
 
@@ -425,26 +307,6 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
                     this.requiresEscapingEncoder = true;
                 }
             }
-        }
-    }
-
-    private void telemetryWrapSendCommand(Runnable command, TelemetrySpanName spanName, Object... args) {
-        TelemetrySpan span = this.session.getTelemetryHandler().startSpan(spanName, args);
-        try (TelemetryScope scope = span.makeCurrent()) {
-            span.setAttribute(TelemetryAttribute.DB_NAME, this.session.getHostInfo().getDatabase());
-            span.setAttribute(TelemetryAttribute.DB_OPERATION, TelemetryAttribute.OPERATION_SET);
-            span.setAttribute(TelemetryAttribute.DB_STATEMENT, TelemetryAttribute.OPERATION_SET + TelemetryAttribute.STATEMENT_SUFFIX);
-            span.setAttribute(TelemetryAttribute.DB_SYSTEM, TelemetryAttribute.DB_SYSTEM_DEFAULT);
-            span.setAttribute(TelemetryAttribute.DB_USER, this.session.getHostInfo().getUser());
-            span.setAttribute(TelemetryAttribute.THREAD_ID, Thread.currentThread().getId());
-            span.setAttribute(TelemetryAttribute.THREAD_NAME, Thread.currentThread().getName());
-
-            command.run();
-        } catch (Throwable t) {
-            span.setError(t);
-            throw t;
-        } finally {
-            span.end();
         }
     }
 
@@ -502,146 +364,6 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
     @Override
     public String getPasswordCharacterEncoding() {
         return getStaticJavaEncodingForCollationIndex(this.sessionCollationIndex);
-    }
-
-    /**
-     * Builds the map needed for 4.1.0 and newer servers that maps field-level
-     * charset/collation info to a java character encoding name.
-     */
-    private void buildCollationMapping() {
-        Map<Integer, String> customCollationIndexToCollationName = null;
-        Map<String, Integer> customCollationNameToCollationIndex = null;
-        Map<Integer, String> customCollationIndexToCharsetName = null;
-        Map<String, Integer> customCharsetNameToMblen = null;
-        Map<String, String> customCharsetNameToJavaEncoding = new HashMap<>();
-        Map<String, String> customJavaEncodingUcToCharsetName = new HashMap<>();
-        Map<String, Integer> customCharsetNameToCollationIndex = new HashMap<>();
-        Set<String> customMultibyteEncodings = new HashSet<>();
-
-        String databaseURL = this.session.getHostInfo().getDatabaseUrl();
-
-        if (this.cacheServerConfiguration.getValue()) {
-            synchronized (customCollationIndexToCharsetNameByUrl) {
-                customCollationIndexToCollationName = customCollationIndexToCollationNameByUrl.get(databaseURL);
-                customCollationNameToCollationIndex = customCollationNameToCollationIndexByUrl.get(databaseURL);
-                customCollationIndexToCharsetName = customCollationIndexToCharsetNameByUrl.get(databaseURL);
-                customCharsetNameToMblen = customCharsetNameToMblenByUrl.get(databaseURL);
-                customCharsetNameToJavaEncoding = customCharsetNameToJavaEncodingByUrl.get(databaseURL);
-                customJavaEncodingUcToCharsetName = customJavaEncodingUcToCharsetNameByUrl.get(databaseURL);
-                customCharsetNameToCollationIndex = customCharsetNameToCollationIndexByUrl.get(databaseURL);
-                customMultibyteEncodings = customMultibyteEncodingsByUrl.get(databaseURL);
-            }
-        }
-
-        if (customCollationIndexToCharsetName == null && this.session.getPropertySet().getBooleanProperty(PropertyKey.detectCustomCollations).getValue()) {
-            TelemetrySpan span = this.session.getTelemetryHandler().startSpan(TelemetrySpanName.LOAD_COLLATIONS);
-            try (TelemetryScope scope = span.makeCurrent()) {
-                span.setAttribute(TelemetryAttribute.DB_NAME, this.session.getHostInfo().getDatabase());
-                span.setAttribute(TelemetryAttribute.DB_OPERATION, TelemetryAttribute.OPERATION_SELECT);
-                span.setAttribute(TelemetryAttribute.DB_STATEMENT, TelemetryAttribute.OPERATION_SELECT + TelemetryAttribute.STATEMENT_SUFFIX);
-                span.setAttribute(TelemetryAttribute.DB_SYSTEM, TelemetryAttribute.DB_SYSTEM_DEFAULT);
-                span.setAttribute(TelemetryAttribute.DB_USER, this.session.getHostInfo().getUser());
-                span.setAttribute(TelemetryAttribute.THREAD_ID, Thread.currentThread().getId());
-                span.setAttribute(TelemetryAttribute.THREAD_NAME, Thread.currentThread().getName());
-
-                customCollationIndexToCollationName = new HashMap<>();
-                customCollationNameToCollationIndex = new HashMap<>();
-                customCollationIndexToCharsetName = new HashMap<>();
-                customCharsetNameToMblen = new HashMap<>();
-                customCharsetNameToJavaEncoding = new HashMap<>();
-                customJavaEncodingUcToCharsetName = new HashMap<>();
-                customCharsetNameToCollationIndex = new HashMap<>();
-                customMultibyteEncodings = new HashSet<>();
-
-                String customCharsetMapping = this.session.getPropertySet().getStringProperty(PropertyKey.customCharsetMapping).getValue();
-                if (customCharsetMapping != null) {
-                    String[] pairs = customCharsetMapping.split(",");
-                    for (String pair : pairs) {
-                        int keyEnd = pair.indexOf(":");
-                        if (keyEnd > 0 && keyEnd + 1 < pair.length()) {
-                            String charset = pair.substring(0, keyEnd);
-                            String encoding = pair.substring(keyEnd + 1);
-                            customCharsetNameToJavaEncoding.put(charset, encoding);
-                            customJavaEncodingUcToCharsetName.put(encoding.toUpperCase(Locale.ENGLISH), charset);
-                        }
-                    }
-                }
-
-                ValueFactory<Integer> ivf = new IntegerValueFactory(this.session.getPropertySet());
-
-                try {
-                    NativePacketPayload resultPacket = this.session.getProtocol().sendCommand(getCommandBuilder().buildComQuery(null, this.session,
-                            "SELECT c.COLLATION_NAME, c.CHARACTER_SET_NAME, c.ID, cs.MAXLEN, c.IS_DEFAULT='Yes' from INFORMATION_SCHEMA.COLLATIONS AS c LEFT JOIN"
-                                    + " INFORMATION_SCHEMA.CHARACTER_SETS AS cs ON cs.CHARACTER_SET_NAME=c.CHARACTER_SET_NAME"),
-                            false, 0);
-                    Resultset rs = this.session.getProtocol().readAllResults(-1, false, resultPacket, false, null,
-                            new ResultsetFactory(Type.FORWARD_ONLY, null));
-                    ValueFactory<String> svf = new StringValueFactory(this.session.getPropertySet());
-                    Row r;
-                    while ((r = rs.getRows().next()) != null) {
-                        String collationName = r.getValue(0, svf);
-                        String charsetName = r.getValue(1, svf);
-                        int collationIndex = ((Number) r.getValue(2, ivf)).intValue();
-                        int maxlen = ((Number) r.getValue(3, ivf)).intValue();
-                        boolean isDefault = ((Number) r.getValue(4, ivf)).intValue() > 0;
-
-                        if (collationIndex >= MAP_SIZE //
-                                || collationIndex != getStaticCollationIndexForCollationName(collationName)
-                                || !charsetName.equals(getStaticMysqlCharsetNameForCollationIndex(collationIndex))) {
-                            customCollationIndexToCollationName.put(collationIndex, collationName);
-                            customCollationNameToCollationIndex.put(collationName, collationIndex);
-                            customCollationIndexToCharsetName.put(collationIndex, charsetName);
-                            if (isDefault || !customCharsetNameToCollationIndex.containsKey(charsetName)
-                                    && CharsetMapping.getStaticCollationIndexForMysqlCharsetName(charsetName) == 0) {
-                                customCharsetNameToCollationIndex.put(charsetName, collationIndex);
-                            }
-                        }
-                        // if no static map for charsetName adding to custom map
-                        if (getStaticMysqlCharsetByName(charsetName) == null) {
-                            customCharsetNameToMblen.put(charsetName, maxlen);
-                            if (maxlen > 1) {
-                                String enc = customCharsetNameToJavaEncoding.get(charsetName);
-                                if (enc != null) {
-                                    customMultibyteEncodings.add(enc.toUpperCase(Locale.ENGLISH));
-                                }
-                            }
-                        }
-
-                    }
-                } catch (IOException e) {
-                    throw ExceptionFactory.createException(e.getMessage(), e, this.session.getExceptionInterceptor());
-                }
-
-                if (this.cacheServerConfiguration.getValue()) {
-                    synchronized (customCollationIndexToCharsetNameByUrl) {
-                        customCollationIndexToCollationNameByUrl.put(databaseURL, Collections.unmodifiableMap(customCollationIndexToCollationName));
-                        customCollationNameToCollationIndexByUrl.put(databaseURL, Collections.unmodifiableMap(customCollationNameToCollationIndex));
-                        customCollationIndexToCharsetNameByUrl.put(databaseURL, Collections.unmodifiableMap(customCollationIndexToCharsetName));
-                        customCharsetNameToMblenByUrl.put(databaseURL, Collections.unmodifiableMap(customCharsetNameToMblen));
-                        customCharsetNameToJavaEncodingByUrl.put(databaseURL, Collections.unmodifiableMap(customCharsetNameToJavaEncoding));
-                        customJavaEncodingUcToCharsetNameByUrl.put(databaseURL, Collections.unmodifiableMap(customJavaEncodingUcToCharsetName));
-                        customCharsetNameToCollationIndexByUrl.put(databaseURL, Collections.unmodifiableMap(customCharsetNameToCollationIndex));
-                        customMultibyteEncodingsByUrl.put(databaseURL, Collections.unmodifiableSet(customMultibyteEncodings));
-                    }
-                }
-            } catch (Throwable t) {
-                span.setError(t);
-                throw t;
-            } finally {
-                span.end();
-            }
-        }
-
-        if (customCollationIndexToCharsetName != null) {
-            this.collationIndexToCollationName = customCollationIndexToCollationName;
-            this.collationNameToCollationIndex = customCollationNameToCollationIndex;
-            this.collationIndexToCharsetName = customCollationIndexToCharsetName;
-            this.charsetNameToMblen = customCharsetNameToMblen;
-            this.charsetNameToJavaEncoding = customCharsetNameToJavaEncoding;
-            this.javaEncodingUcToCharsetName = customJavaEncodingUcToCharsetName;
-            this.charsetNameToCollationIndex = customCharsetNameToCollationIndex;
-            this.multibyteEncodings = customMultibyteEncodings;
-        }
     }
 
     @Override
@@ -748,11 +470,6 @@ public class NativeCharsetSettings extends CharsetMapping implements CharsetSett
             return true;
         }
         return isStaticMultibyteCharset(javaEncodingName);
-    }
-
-    @Override
-    public int getMaxBytesPerChar(String javaCharsetName) {
-        return getMaxBytesPerChar(null, javaCharsetName);
     }
 
     @Override

@@ -20,10 +20,11 @@
 
 package com.mysql.cj.protocol;
 
-import java.io.IOException;
-
+import com.mysql.cj.exceptions.CJException;
 import com.mysql.cj.exceptions.CJOperationNotSupportedException;
 import com.mysql.cj.exceptions.ExceptionFactory;
+
+import java.io.IOException;
 
 public interface ProtocolEntityReader<T extends ProtocolEntity, M extends Message> {
 
@@ -35,7 +36,7 @@ public interface ProtocolEntityReader<T extends ProtocolEntity, M extends Messag
      * @throws IOException
      *             if an error occurs
      */
-    default T read(ProtocolEntityFactory<T, M> sf) throws IOException {
+    default T read(ProtocolEntityFactory<T, M> sf) throws IOException, CJException {
         throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not allowed");
     }
 
@@ -43,11 +44,6 @@ public interface ProtocolEntityReader<T extends ProtocolEntity, M extends Messag
      * Reads one result set off of the wire, if the result is actually an
      * update count, creates an update-count only result set.
      *
-     * @param maxRows
-     *            the maximum number of rows to read (-1 means all rows)
-     * @param streamResults
-     *            should the driver leave the results on the wire,
-     *            and read them only when needed?
      * @param resultPacket
      *            the first packet of information in the result set
      * @param metadata
@@ -60,8 +56,8 @@ public interface ProtocolEntityReader<T extends ProtocolEntity, M extends Messag
      * @throws IOException
      *             if an error occurs while reading the rows
      */
-    default T read(int maxRows, boolean streamResults, M resultPacket, ColumnDefinition metadata, ProtocolEntityFactory<T, M> protocolEntityFactory)
-            throws IOException {
+    default T read(M resultPacket, ColumnDefinition metadata, ProtocolEntityFactory<T, M> protocolEntityFactory)
+            throws IOException, CJException {
         throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not allowed");
     }
 

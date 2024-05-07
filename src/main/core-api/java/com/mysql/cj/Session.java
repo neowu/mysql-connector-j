@@ -20,25 +20,10 @@
 
 package com.mysql.cj;
 
-import java.net.SocketAddress;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.Collector;
-
 import com.mysql.cj.conf.HostInfo;
 import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.exceptions.CJOperationNotSupportedException;
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.log.Log;
-import com.mysql.cj.log.ProfilerEventHandler;
-import com.mysql.cj.protocol.Message;
 import com.mysql.cj.protocol.Protocol;
-import com.mysql.cj.protocol.ResultBuilder;
 import com.mysql.cj.protocol.ServerSession;
-import com.mysql.cj.result.Row;
-import com.mysql.cj.telemetry.TelemetryHandler;
 
 /**
  * {@link Session} exposes logical level which user API uses internally to call {@link Protocol} methods.
@@ -49,25 +34,6 @@ import com.mysql.cj.telemetry.TelemetryHandler;
 public interface Session {
 
     PropertySet getPropertySet();
-
-    <M extends Message> MessageBuilder<M> getMessageBuilder();
-
-    /**
-     * Re-authenticates as the given user and password
-     *
-     * @param userName
-     *            DB user name
-     * @param password
-     *            DB user password
-     * @param database
-     *            database name
-     *
-     */
-    void changeUser(String userName, String password, String database);
-
-    ExceptionInterceptor getExceptionInterceptor();
-
-    void setExceptionInterceptor(ExceptionInterceptor exceptionInterceptor);
 
     /**
      * Log-off of the MySQL server and close the socket.
@@ -80,69 +46,15 @@ public interface Session {
      */
     void forceClose();
 
-    /**
-     * Does the version of the MySQL server we are connected to meet the given
-     * minimums?
-     *
-     * @param major
-     *            major version number
-     * @param minor
-     *            minor version number
-     * @param subminor
-     *            sub-minor version number
-     * @return true if current server version equal or higher than provided one
-     */
-    boolean versionMeetsMinimum(int major, int minor, int subminor);
-
     long getThreadId();
 
     boolean isSetNeededForAutoCommitMode(boolean autoCommitFlag);
 
-    /**
-     * Returns the log mechanism that should be used to log information from/for this Session.
-     *
-     * @return the Log instance to use for logging messages.
-     */
-    Log getLog();
-
-    /**
-     * Returns the current ProfilerEventHandler or initializes a new one if none exists.
-     *
-     * @return the {@link ProfilerEventHandler} object.
-     */
-    ProfilerEventHandler getProfilerEventHandler();
-
-    /**
-     * Returns the comment that will be prepended to all statements sent to the server.
-     *
-     * @return query comment string
-     */
-    String getQueryComment();
-
-    /**
-     * Sets the comment that will be prepended to all statements sent to the server. Do not use slash-star or star-slash tokens in the comment as these will be
-     * added by the driver itself.
-     *
-     * @param comment
-     *            query comment string
-     */
-    void setQueryComment(String comment);
-
-    void setTelemetryHandler(TelemetryHandler telemetryHandler);
-
-    TelemetryHandler getTelemetryHandler();
-
     HostInfo getHostInfo();
-
-    String getQueryTimingUnits();
 
     ServerSession getServerSession();
 
     boolean isSSLEstablished();
-
-    SocketAddress getRemoteSocketAddress();
-
-    String getProcessHost();
 
     /**
      * Add listener for this session status changes.
@@ -152,85 +64,9 @@ public interface Session {
      */
     void addListener(SessionEventListener l);
 
-    /**
-     * Remove session listener.
-     *
-     * @param l
-     *            {@link SessionEventListener} instance.
-     */
-    void removeListener(SessionEventListener l);
-
-    public static interface SessionEventListener {
-
-        void handleNormalClose();
-
-        void handleReconnect();
-
+    interface SessionEventListener {
         void handleCleanup(Throwable whyCleanedUp);
-
     }
 
     boolean isClosed();
-
-    String getIdentifierQuoteString();
-
-    DataStoreMetadata getDataStoreMetadata();
-
-    /**
-     * Synchronously query database with applying rows filtering and mapping.
-     *
-     * @param message
-     *            query message
-     * @param rowFilter
-     *            row filter function
-     * @param rowMapper
-     *            row map function
-     * @param collector
-     *            result collector
-     * @param <M>
-     *            Message type
-     * @param <R>
-     *            Row type
-     * @param <RES>
-     *            Result type
-     * @return List of rows
-     */
-    default <M extends Message, R, RES> RES query(M message, Predicate<Row> rowFilter, Function<Row, R> rowMapper, Collector<R, ?, RES> collector) {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not supported");
-    }
-
-    /**
-     * Synchronously query database.
-     *
-     * @param message
-     *            query message
-     * @param resultBuilder
-     *            ResultBuilder instance
-     * @param <M>
-     *            Message type
-     * @param <R>
-     *            Result type
-     * @return {@link QueryResult} object
-     */
-    default <M extends Message, R extends QueryResult> R query(M message, ResultBuilder<R> resultBuilder) {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not supported");
-    }
-
-    /**
-     * Asynchronously query database.
-     *
-     * @param message
-     *            query message
-     * @param resultBuilder
-     *            ResultBuilder instance
-     * @param <M>
-     *            Message type
-     * @param <R>
-     *            Result type
-     * @return CompletableFuture providing a {@link QueryResult} object
-     */
-    default <M extends Message, R extends QueryResult> CompletableFuture<R> queryAsync(M message, ResultBuilder<R> resultBuilder) {
-        throw ExceptionFactory.createException(CJOperationNotSupportedException.class, "Not supported");
-    }
-
 }

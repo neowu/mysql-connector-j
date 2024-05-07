@@ -20,6 +20,15 @@
 
 package com.mysql.cj.protocol.a;
 
+import com.mysql.cj.BindValue;
+import com.mysql.cj.Messages;
+import com.mysql.cj.conf.PropertySet;
+import com.mysql.cj.exceptions.ExceptionFactory;
+import com.mysql.cj.exceptions.WrongArgumentException;
+import com.mysql.cj.protocol.ServerSession;
+import com.mysql.cj.util.StringUtils;
+import com.mysql.cj.util.TimeUtil;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
@@ -29,38 +38,21 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-import com.mysql.cj.BindValue;
-import com.mysql.cj.Messages;
-import com.mysql.cj.conf.PropertySet;
-import com.mysql.cj.exceptions.CJException;
-import com.mysql.cj.exceptions.ExceptionFactory;
-import com.mysql.cj.exceptions.ExceptionInterceptor;
-import com.mysql.cj.exceptions.WrongArgumentException;
-import com.mysql.cj.protocol.InternalDate;
-import com.mysql.cj.protocol.InternalTime;
-import com.mysql.cj.protocol.InternalTimestamp;
-import com.mysql.cj.protocol.Message;
-import com.mysql.cj.protocol.ServerSession;
-import com.mysql.cj.protocol.a.NativeConstants.IntegerDataType;
-import com.mysql.cj.protocol.a.NativeConstants.StringSelfDataType;
-import com.mysql.cj.util.StringUtils;
-import com.mysql.cj.util.TimeUtil;
-
 public class StringValueEncoder extends AbstractValueEncoder {
 
     /** Charset encoder used to escape if needed, such as Yen sign in SJIS */
     private CharsetEncoder charsetEncoder;
 
     @Override
-    public void init(PropertySet pset, ServerSession serverSess, ExceptionInterceptor excInterceptor) {
-        super.init(pset, serverSess, excInterceptor);
+    public void init(PropertySet pset, ServerSession serverSess) {
+        super.init(pset, serverSess);
         if (this.serverSession.getCharsetSettings().getRequiresEscapingEncoder()) {
             this.charsetEncoder = Charset.forName(this.charEncoding.getValue()).newEncoder();
         }
     }
 
     @Override
-    public byte[] getBytes(BindValue binding) {
+    public byte[] getBytes(BindValue binding) throws WrongArgumentException {
         switch (binding.getMysqlType()) {
             case NULL:
                 return StringUtils.getBytes("null");
@@ -81,27 +73,12 @@ public class StringValueEncoder extends AbstractValueEncoder {
             case MEDIUMBLOB:
             case LONGBLOB:
                 String x = (String) binding.getValue();
-                if (binding.isNational() && !this.charEncoding.getValue().equalsIgnoreCase("UTF-8") && !this.charEncoding.getValue().equalsIgnoreCase("utf8")) {
-                    // Add introducer _utf8 for NATIONAL CHARACTER
-                    StringBuilder buf = new StringBuilder((int) (x.length() * 1.1 + 4));
-                    buf.append("_utf8");
-                    StringUtils.escapeString(buf, x, this.serverSession.useAnsiQuotedIdentifiers(), null);
-                    return StringUtils.getBytes(buf.toString(), "UTF-8");
-                }
 
                 int stringLength = x.length();
 
-                if (this.serverSession.isNoBackslashEscapesSet()) {
-                    // Scan for any nasty chars
-                    if (!isEscapeNeededForString(x, stringLength)) {
-                        return StringUtils.getBytesWrapped(x, '\'', '\'', this.charEncoding.getValue());
-                    }
-                    return escapeBytesIfNeeded(StringUtils.getBytes(x, this.charEncoding.getValue()));
-                }
-
                 if (isEscapeNeededForString(x, stringLength)) {
                     String escString = StringUtils
-                            .escapeString(new StringBuilder((int) (x.length() * 1.1)), x, this.serverSession.useAnsiQuotedIdentifiers(), this.charsetEncoder)
+                            .escapeString(new StringBuilder((int) (x.length() * 1.1)), x, false, this.charsetEncoder)
                             .toString();
                     return StringUtils.getBytes(escString, this.charEncoding.getValue());
                 }
@@ -114,7 +91,7 @@ public class StringValueEncoder extends AbstractValueEncoder {
     }
 
     @Override
-    public String getString(BindValue binding) {
+    public String getString(BindValue binding) throws WrongArgumentException {
         String x = (String) binding.getValue();
         switch (binding.getMysqlType()) {
             case NULL:
@@ -129,8 +106,7 @@ public class StringValueEncoder extends AbstractValueEncoder {
                 } else if (x.matches("-?\\d+\\.?\\d*")) {
                     b = !x.matches("-?[0]+[.]*[0]*");
                 } else {
-                    throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("PreparedStatement.66", new Object[] { x }),
-                            this.exceptionInterceptor);
+                    throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("PreparedStatement.66", new Object[] { x }));
                 }
                 return String.valueOf(b ? 1 : 0);
             case TINYINT:
@@ -189,8 +165,7 @@ public class StringValueEncoder extends AbstractValueEncoder {
                     return sb.toString();
                 }
                 throw ExceptionFactory.createException(WrongArgumentException.class,
-                        Messages.getString("PreparedStatement.67", new Object[] { dt.getClass().getName(), binding.getMysqlType().toString() }),
-                        this.exceptionInterceptor);
+                        Messages.getString("PreparedStatement.67", new Object[] { dt.getClass().getName(), binding.getMysqlType().toString() }));
             case DATETIME:
             case TIMESTAMP:
                 dt = TimeUtil.parseToDateTimeObject(x, binding.getMysqlType());
@@ -206,8 +181,7 @@ public class StringValueEncoder extends AbstractValueEncoder {
                     return sb.toString();
                 }
                 throw ExceptionFactory.createException(WrongArgumentException.class,
-                        Messages.getString("PreparedStatement.67", new Object[] { dt.getClass().getName(), binding.getMysqlType().toString() }),
-                        this.exceptionInterceptor);
+                        Messages.getString("PreparedStatement.67", new Object[] { dt.getClass().getName(), binding.getMysqlType().toString() }));
             case TIME:
                 dt = TimeUtil.parseToDateTimeObject(x, binding.getMysqlType());
                 if (dt instanceof LocalTime) {
@@ -227,8 +201,7 @@ public class StringValueEncoder extends AbstractValueEncoder {
                     return sb.toString();
                 }
                 throw ExceptionFactory.createException(WrongArgumentException.class,
-                        Messages.getString("PreparedStatement.67", new Object[] { dt.getClass().getName(), binding.getMysqlType().toString() }),
-                        this.exceptionInterceptor);
+                        Messages.getString("PreparedStatement.67", new Object[] { dt.getClass().getName(), binding.getMysqlType().toString() }));
             case YEAR:
                 dt = TimeUtil.parseToDateTimeObject(x, binding.getMysqlType());
                 if (dt instanceof LocalDate) {
@@ -237,150 +210,13 @@ public class StringValueEncoder extends AbstractValueEncoder {
                     return String.valueOf(((LocalDateTime) dt).getYear());
                 }
                 throw ExceptionFactory.createException(WrongArgumentException.class,
-                        Messages.getString("PreparedStatement.67", new Object[] { dt.getClass().getName(), binding.getMysqlType().toString() }),
-                        this.exceptionInterceptor);
+                        Messages.getString("PreparedStatement.67", new Object[] { dt.getClass().getName(), binding.getMysqlType().toString() }));
 
             default:
                 break;
         }
         throw ExceptionFactory.createException(WrongArgumentException.class,
-                Messages.getString("PreparedStatement.67", new Object[] { binding.getValue().getClass().getName(), binding.getMysqlType().toString() }),
-                this.exceptionInterceptor);
-    }
-
-    @Override
-    public void encodeAsQueryAttribute(Message msg, BindValue binding) {
-        NativePacketPayload intoPacket = (NativePacketPayload) msg;
-        String x = (String) binding.getValue();
-        intoPacket.writeBytes(StringSelfDataType.STRING_LENENC, StringUtils.getBytes(x, this.charEncoding.getValue()));
-    }
-
-    @Override
-    public void encodeAsBinary(Message msg, BindValue binding) {
-        NativePacketPayload intoPacket = (NativePacketPayload) msg;
-
-        String x = (String) binding.getValue();
-        switch (binding.getMysqlType()) {
-            case BOOLEAN:
-            case BIT:
-                Boolean b = null;
-                if ("true".equalsIgnoreCase(x) || "Y".equalsIgnoreCase(x)) {
-                    b = true;
-                } else if ("false".equalsIgnoreCase(x) || "N".equalsIgnoreCase(x)) {
-                    b = false;
-                } else if (x.matches("-?\\d+\\.?\\d*")) {
-                    b = !x.matches("-?[0]+[.]*[0]*");
-                } else {
-                    throw ExceptionFactory.createException(WrongArgumentException.class, Messages.getString("PreparedStatement.66", new Object[] { x }),
-                            this.exceptionInterceptor);
-                }
-                intoPacket.writeInteger(IntegerDataType.INT1, b ? 1L : 0L);
-                return;
-            case TINYINT:
-            case TINYINT_UNSIGNED:
-                intoPacket.writeInteger(IntegerDataType.INT1, Long.parseLong(x));
-                return;
-            case SMALLINT:
-            case SMALLINT_UNSIGNED:
-            case MEDIUMINT:
-            case MEDIUMINT_UNSIGNED:
-                intoPacket.writeInteger(IntegerDataType.INT2, Long.parseLong(x));
-                return;
-            case INT:
-            case INT_UNSIGNED:
-                intoPacket.writeInteger(IntegerDataType.INT4, Long.parseLong(x));
-                return;
-            case BIGINT:
-            case BIGINT_UNSIGNED:
-                intoPacket.writeInteger(IntegerDataType.INT8, Long.parseLong(x));
-                return;
-            case FLOAT:
-            case FLOAT_UNSIGNED:
-                intoPacket.writeInteger(IntegerDataType.INT4, Float.floatToIntBits(Float.parseFloat(x)));
-                return;
-            case DOUBLE:
-            case DOUBLE_UNSIGNED:
-                intoPacket.writeInteger(IntegerDataType.INT8, Double.doubleToLongBits(Double.parseDouble(x)));
-                return;
-            case DECIMAL:
-            case DECIMAL_UNSIGNED:
-                BigDecimal bd = getScaled(new BigDecimal(x), binding.getScaleOrLength());
-                intoPacket.writeBytes(StringSelfDataType.STRING_LENENC, StringUtils.getBytes(bd.toPlainString(), this.charEncoding.getValue()));
-                return;
-            case CHAR:
-            case ENUM:
-            case SET:
-            case VARCHAR:
-            case TINYTEXT:
-            case TEXT:
-            case MEDIUMTEXT:
-            case LONGTEXT:
-            case JSON:
-            case BINARY:
-            case GEOMETRY:
-            case VARBINARY:
-            case TINYBLOB:
-            case BLOB:
-            case MEDIUMBLOB:
-            case LONGBLOB:
-                if (binding.isNational() && !this.charEncoding.getValue().equalsIgnoreCase("UTF-8") && !this.charEncoding.getValue().equalsIgnoreCase("utf8")) {
-                    throw ExceptionFactory.createException(Messages.getString("ServerPreparedStatement.31"), this.exceptionInterceptor);
-                }
-                try {
-                    intoPacket.writeBytes(StringSelfDataType.STRING_LENENC, StringUtils.getBytes(x, this.charEncoding.getValue()));
-                } catch (CJException uEE) {
-                    throw ExceptionFactory.createException(Messages.getString("ServerPreparedStatement.31") + this.charEncoding.getValue() + "'", uEE,
-                            this.exceptionInterceptor);
-                }
-                return;
-            case DATE:
-                Object dt = TimeUtil.parseToDateTimeObject(x, binding.getMysqlType());
-                if (dt instanceof LocalDate) {
-                    writeDate(msg, InternalDate.from((LocalDate) dt));
-                    return;
-                } else if (dt instanceof LocalDateTime) {
-                    writeDateTime(msg, InternalTimestamp.from((LocalDateTime) dt));
-                    return;
-                }
-                break;
-            case DATETIME:
-            case TIMESTAMP:
-                dt = TimeUtil.parseToDateTimeObject(x, binding.getMysqlType());
-                if (dt instanceof LocalDate) {
-                    writeDateTime(msg, InternalTimestamp.from((LocalDate) dt));
-                    return;
-                } else if (dt instanceof LocalDateTime) {
-                    writeDateTime(msg, InternalTimestamp.from((LocalDateTime) dt));
-                    return;
-                }
-                break;
-            case TIME:
-                dt = TimeUtil.parseToDateTimeObject(x, binding.getMysqlType());
-                if (dt instanceof LocalTime) {
-                    writeTime(msg, InternalTime.from((LocalTime) dt));
-                    return;
-                } else if (dt instanceof Duration) {
-                    writeTime(msg, InternalTime.from(adjustDuration(Duration.ofNanos(((Duration) binding.getValue()).toNanos()), binding.getField())));
-                    return;
-                }
-                break;
-            case YEAR:
-                dt = TimeUtil.parseToDateTimeObject(x, binding.getMysqlType());
-                if (dt instanceof LocalDate) {
-                    intoPacket.writeInteger(IntegerDataType.INT4, ((LocalDate) dt).getYear());
-                    return;
-                } else if (dt instanceof LocalDateTime) {
-                    intoPacket.writeInteger(IntegerDataType.INT4, ((LocalDateTime) dt).getYear());
-                    return;
-                }
-                break;
-
-            default:
-                break;
-        }
-        throw ExceptionFactory.createException(WrongArgumentException.class,
-                Messages.getString("PreparedStatement.67", new Object[] { binding.getValue().getClass().getName(), binding.getMysqlType().toString() }),
-                this.exceptionInterceptor);
+                Messages.getString("PreparedStatement.67", new Object[] { binding.getValue().getClass().getName(), binding.getMysqlType().toString() }));
     }
 
     private boolean isEscapeNeededForString(String x, int stringLength) {
